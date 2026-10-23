@@ -106,12 +106,24 @@ main { padding-top: 14px; }
 .icon-btn:hover { background: var(--surface); color: var(--fg); }
 .icon-btn.armed { background: var(--warn); color: var(--surface); padding: 0 8px; font-size: 12px; }
 .cards { display: flex; flex-direction: column; gap: 8px; min-height: 40px; border-radius: 8px; }
-.cards.over { background: var(--accent-soft); }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; cursor: grab; text-align: left; width: 100%; }
 .card:hover { border-color: var(--muted); }
-.card.dragging, .chip.dragging { opacity: .4; }
-.card.drop-before { box-shadow: 0 -3px 0 0 var(--accent); }
-.cards.drop-end { box-shadow: inset 0 -3px 0 0 var(--accent); }
+.card, .chip { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.card.drag-src { display: none; }
+.chip.drag-src { opacity: .35; }
+.ph { flex: none; border-radius: 10px; background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); overflow: hidden;
+  transition: height .22s cubic-bezier(.2,.8,.2,1), margin-top .22s cubic-bezier(.2,.8,.2,1), opacity .18s; }
+.drag-wrap { position: fixed; left: 0; top: 0; z-index: 100; pointer-events: none; will-change: transform; }
+.drag-wrap > * { margin: 0; width: 100%; height: 100%; box-sizing: border-box; border-color: var(--accent); cursor: grabbing;
+  box-shadow: 0 14px 30px rgb(0 0 0 / .26), 0 2px 6px rgb(0 0 0 / .18); transform-origin: var(--gx, 50%) var(--gy, 50%);
+  transition: scale .18s cubic-bezier(.2,.8,.2,1), opacity .14s; }
+body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select: none !important; -webkit-user-select: none !important; }
+.drop-on { box-shadow: inset 0 0 0 2px var(--accent); }
+.ghost-chip { pointer-events: none; background: var(--accent-soft); border-color: var(--accent); color: var(--accent); overflow: hidden;
+  max-height: 0; margin-top: -4px; padding-block: 0; border-width: 0; opacity: 0;
+  transition: max-height .16s ease, margin-top .16s ease, padding .16s ease, opacity .16s ease; }
+.ghost-chip.in { max-height: 34px; margin-top: 0; padding-block: 3px; border-width: 1px; opacity: 1; }
+.ghost-chip .dot { background: var(--accent); }
 .card-title { font-weight: 500; overflow-wrap: anywhere; }
 .card.done .card-title { text-decoration: line-through; color: var(--muted); }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
@@ -152,7 +164,6 @@ main { padding-top: 14px; }
 .day:nth-child(7n) { border-right: 0; }
 .day.out { background: var(--col); }
 .day.out .num { color: var(--muted); }
-.day.over { background: var(--accent-soft); }
 .day-top { display: flex; justify-content: space-between; align-items: center; }
 .num { font-size: 12px; font-weight: 600; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; font-variant-numeric: tabular-nums; }
 .day.today .num { background: var(--accent); color: var(--accent-ink); }
@@ -167,7 +178,6 @@ main { padding-top: 14px; }
 .chip.routine { border-style: dashed; }
 .more { font-size: 11px; color: var(--muted); padding-left: 4px; }
 .inbox { flex: none; max-height: 150px; overflow: auto; background: var(--col); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-.inbox.over { background: var(--accent-soft); }
 .inbox h3 { font-family: var(--font-display); font-size: 15px; margin: 2px 4px 0; display: flex; justify-content: space-between; align-items: center; }
 .inbox p { margin: 0 4px; font-size: 12px; color: var(--muted); }
 .inbox-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; }
@@ -185,14 +195,12 @@ main { padding-top: 14px; }
 .tg-allday { border-top: 1px solid var(--line); }
 .tg-adl { font-size: 10px; color: var(--muted); padding: 8px 4px 0 6px; line-height: 1.2; }
 .tg-ad { border-left: 1px solid var(--line); padding: 4px 24px 4px 4px; min-height: 34px; display: flex; flex-direction: column; gap: 3px; position: relative; min-width: 0; }
-.tg-ad.over { background-color: var(--accent-soft); }
 .tg-ad .add-day { position: absolute; right: 2px; top: 4px; }
 .tg-body { display: grid; position: relative; }
 .tg-gutter { position: relative; }
 .tg-gutter span { position: absolute; right: 6px; font-size: 11px; color: var(--muted); transform: translateY(-50%); font-variant-numeric: tabular-nums; }
 .tg-col { position: relative; border-left: 1px solid var(--line); min-width: 0;
   background-image: repeating-linear-gradient(to bottom, var(--line) 0, var(--line) 1px, transparent 1px, transparent 60px); }
-.tg-col.over { background-color: var(--accent-soft); }
 .now { position: absolute; left: 0; right: 0; height: 2px; background: var(--accent); z-index: 3; pointer-events: none; }
 .now::before { content: ""; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .ev { position: absolute; z-index: 2; border: 1px solid var(--line); border-left: 3px solid var(--afg, var(--muted)); border-radius: 6px;
@@ -211,6 +219,8 @@ main { padding-top: 14px; }
 .ev-h.h-t { top: 0; } .ev-h.h-b { bottom: 0; }
 .ev.dragging-ev { z-index: 5; box-shadow: 0 6px 16px rgb(0 0 0 / .28); cursor: grabbing; opacity: 1; }
 .ev.ghost { pointer-events: none; background: var(--accent-soft); color: var(--accent); border-left-color: var(--accent); }
+.ev.pv { z-index: 4; opacity: 0; background: color-mix(in srgb, var(--accent) 16%, var(--surface)); box-shadow: 0 0 0 1px var(--accent), 0 6px 16px rgb(0 0 0 / .18); transition: opacity .14s; }
+.ev.pv.in { opacity: 1; transition: opacity .14s, top .1s ease-out, height .1s ease-out; }
 
 /* connect + modal */
 .connect { max-width: 520px; margin: 32px auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px; display: flex; flex-direction: column; gap: 14px; }
@@ -840,21 +850,214 @@ main { padding-top: 14px; }
       delete btn.dataset.armed; btn.textContent = btn.dataset.orig; btn.classList.remove('armed');
     }, 3000);
   }
-  function clearMarks() {
-    document.querySelectorAll('.drop-before,.drop-end,.over').forEach(function (n) { n.classList.remove('drop-before', 'drop-end', 'over'); });
-  }
+  /* ---------- перетаскивание ---------- */
+  var drag = null;
+  function setDrop(node, drop) { node._dz = { drop: drop }; }
   function attachDrag(node, id) {
-    node.draggable = true;
-    node.addEventListener('dragstart', function (e) {
-      dragId = id; e.dataTransfer.setData('text/plain', id); e.dataTransfer.effectAllowed = 'move';
-      setTimeout(function () { node.classList.add('dragging'); }, 0);
-    });
-    node.addEventListener('dragend', function () { dragId = null; node.classList.remove('dragging'); clearMarks(); if (needRender) render(); });
+    node.addEventListener('dragstart', function (e) { e.preventDefault(); });
+    node.addEventListener('pointerdown', function (e) { dragDown(e, node, id); });
   }
-  function dropZone(node, onDrop, mark) {
-    node.addEventListener('dragover', function (e) { if (!dragId) return; e.preventDefault(); clearMarks(); (mark || function () { node.classList.add('over'); })(e); });
-    node.addEventListener('dragleave', function (e) { if (!node.contains(e.relatedTarget)) clearMarks(); });
-    node.addEventListener('drop', function (e) { if (!dragId) return; e.preventDefault(); var id = dragId; dragId = null; clearMarks(); onDrop(id, e); });
+  function dragDown(e, node, id) {
+    if (drag || dragId || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    var touch = e.pointerType !== 'mouse', pid = e.pointerId, x0 = e.clientX, y0 = e.clientY, timer = null;
+    function off() {
+      clearTimeout(timer);
+      window.removeEventListener('pointermove', pre); window.removeEventListener('pointerup', off); window.removeEventListener('pointercancel', off);
+    }
+    function pre(ev) {
+      if (ev.pointerId !== pid) return;
+      var dist = Math.hypot(ev.clientX - x0, ev.clientY - y0);
+      if (touch) { if (dist > 8) off(); } else if (dist > 4) { off(); dragStart(node, id, ev.clientX, ev.clientY, pid); }
+    }
+    window.addEventListener('pointermove', pre); window.addEventListener('pointerup', off); window.addEventListener('pointercancel', off);
+    if (touch) timer = setTimeout(function () { off(); dragStart(node, id, x0, y0, pid); }, 260);
+  }
+  function dragStart(node, id, x, y, pid) {
+    var d0 = draftOf(id); if (!d0 || !node.isConnected) return;
+    try { node.releasePointerCapture(pid); } catch (e) {}
+    var r = node.getBoundingClientRect(), isCard = node.classList.contains('card');
+    var S = drag = { id: id, node: node, d0: d0, isCard: isCard, h: isCard ? r.height : 52, gx: x - r.left, gy: y - r.top, x: x, y: y, lx: x, tt: 0,
+      px: r.left, py: r.top, tgt: null, ph: null, phList: null, phRef: null, pv: null, pvStart: 0, ctrl: false, t: performance.now(), done: false };
+    S.dur = d0.start != null ? endOf(d0) - d0.start : (d0.estimate || 60);
+    dragId = id;
+    document.body.classList.add('is-dragging');
+    var inner = node.cloneNode(true);
+    inner.removeAttribute('title'); inner.classList.remove('dragging');
+    inner.style.setProperty('--gx', S.gx + 'px'); inner.style.setProperty('--gy', S.gy + 'px');
+    var wrap = el('div', { class: 'drag-wrap' }, inner);
+    wrap.style.width = r.width + 'px'; wrap.style.height = r.height + 'px';
+    document.body.appendChild(wrap);
+    S.wrap = wrap; S.inner = inner;
+    requestAnimationFrame(function () { inner.style.scale = '1.04'; });
+    if (isCard) {
+      var list = node.parentNode;
+      S.homeList = list;
+      var p = makePh(); list.insertBefore(p, node); openPh(p, S.h, true);
+      node.classList.add('drag-src');
+      S.ph = p; S.phList = list; S.phRef = S.homeRef = nextCard(p);
+    } else node.classList.add('drag-src');
+    S.mv = function (ev) { if (ev.pointerId !== pid && ev.pointerType !== 'mouse') return; S.tt = clamp((ev.clientX - S.lx) * 0.9, -8, 8); S.lx = ev.clientX; S.x = ev.clientX; S.y = ev.clientY; S.ctrl = ev.ctrlKey; };
+    S.up = function () { finish(true); };
+    S.cancel = function () { finish(false); };
+    S.key = function (ev) { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); finish(false); } };
+    S.tm = function (ev) { ev.preventDefault(); };
+    S.cm = function (ev) { ev.preventDefault(); };
+    S.swallow = function (ev) { ev.stopPropagation(); ev.preventDefault(); };
+    window.addEventListener('pointermove', S.mv); window.addEventListener('pointerup', S.up); window.addEventListener('pointercancel', S.cancel);
+    window.addEventListener('keydown', S.key, true); window.addEventListener('touchmove', S.tm, { passive: false });
+    window.addEventListener('contextmenu', S.cm); window.addEventListener('click', S.swallow, true);
+    S.raf = requestAnimationFrame(dragTick);
+  }
+  function placeClone(S) {
+    S.wrap.style.transform = 'translate3d(' + S.px + 'px,' + S.py + 'px,0)';
+    S.inner.style.rotate = S.tt.toFixed(2) + 'deg';
+  }
+  function dragTick(now) {
+    var S = drag; if (!S || S.done) return;
+    S.t = now; S.tt *= 0.88;
+    dragScroll(S);
+    S.px = S.x - S.gx; S.py = S.y - S.gy; placeClone(S);
+    dragUpdate(S);
+    S.raf = requestAnimationFrame(dragTick);
+  }
+  function dragScroll(S) {
+    var h = document.elementFromPoint(S.x, S.y), sc = h && h.closest('.board, .tg, .cal-scroll, .inbox');
+    if (!sc) return;
+    var r = sc.getBoundingClientRect(), edge = 56, v = 18;
+    function f(d) { return d < edge ? Math.ceil((edge - Math.max(d, 0)) / edge * v) : 0; }
+    sc.scrollTop += f(r.bottom - S.y) - f(S.y - r.top);
+    sc.scrollLeft += f(r.right - S.x) - f(S.x - r.left);
+  }
+  function makePh() { var p = el('div', { class: 'ph' }); p.style.height = '0px'; p.style.marginTop = '-8px'; p.style.opacity = '0'; return p; }
+  function openPh(p, h, instant) {
+    if (instant) p.style.transition = 'none';
+    p.offsetHeight;
+    p.style.height = h + 'px'; p.style.marginTop = '0px'; p.style.opacity = '1';
+    if (instant) { p.offsetHeight; p.style.transition = ''; }
+  }
+  function closePh(p) {
+    p.style.height = '0px'; p.style.marginTop = '-8px'; p.style.opacity = '0';
+    setTimeout(function () { p.remove(); }, 260);
+  }
+  function nextCard(ph) {
+    var n = ph.nextElementSibling;
+    while (n && !(n.classList.contains('card') && n !== drag.node)) n = n.nextElementSibling;
+    return n;
+  }
+  function placeAt(S, list, ref) {
+    if (S.ph && S.phList === list && S.phRef === ref) return;
+    if (S.ph) closePh(S.ph);
+    var p = makePh();
+    list.insertBefore(p, ref);
+    S.ph = p; S.phList = list; S.phRef = ref;
+    openPh(p, S.h);
+  }
+  function releaseList(S) { if (S.ph) { closePh(S.ph); S.ph = null; S.phList = null; S.phRef = null; } }
+  function updateList(S, list) {
+    var acc = 0, idx = 0, cards = [], kids = list.children;
+    for (var i = 0; i < kids.length; i++) {
+      var c = kids[i];
+      if (c.classList.contains('ph')) acc += c.getBoundingClientRect().height + parseFloat(getComputedStyle(c).marginTop) + 8;
+      else if (c.classList.contains('card') && c !== S.node) {
+        var r = c.getBoundingClientRect();
+        if (S.y > r.top - acc + r.height / 2) idx++;
+        cards.push(c);
+      }
+    }
+    placeAt(S, list, cards[idx] || null);
+  }
+  function findTarget(x, y) {
+    var h = document.elementFromPoint(x, y); if (!h) return null;
+    var n = h.closest('.tg-col, .tg-ad, .day, .inbox, .col');
+    if (!n) return h.closest('.board') ? { keep: true } : null;
+    if (n.classList.contains('col')) { var l = n.querySelector('.cards'); return l && l._dz ? { kind: 'list', node: l } : null; }
+    if (!n._dz) return null;
+    return { kind: n.classList.contains('tg-col') ? 'ev' : 'chip', node: n };
+  }
+  function dragUpdate(S) {
+    var t = findTarget(S.x, S.y);
+    if (t && t.keep) t = S.tgt;
+    S.tgt = t;
+    if (!t) { releaseList(S); clearPv(S); S.inner.style.opacity = '1'; return; }
+    if (t.kind === 'list') { clearPv(S); updateList(S, t.node); S.inner.style.opacity = '1'; return; }
+    releaseList(S);
+    if (t.kind === 'ev') {
+      var q = S.ctrl ? 1 : 5, m = minAt(t.node, S.y) - Math.min(S.dur / 2, 12);
+      var dur = clamp(S.dur, 5, 1440);
+      S.pvStart = clamp(Math.round(m / q) * q, 0, 1440 - dur);
+      var pv = setPv(S, 'ev', t.node);
+      paintEv(pv, S.pvStart, S.pvStart + dur);
+      S.inner.style.opacity = '0';
+    } else {
+      if (t.node.contains(S.node)) clearPv(S); else setPv(S, 'chip', t.node);
+      S.inner.style.opacity = '1';
+    }
+  }
+  function setPv(S, kind, node) {
+    if (S.pv && S.pv.node === node) return S.pv.el;
+    clearPv(S);
+    var p, d = S.d0;
+    if (kind === 'ev') {
+      p = el('div', { class: 'ev ghost pv', data: { a: d.area } }, el('span', { class: 'ev-time' }), el('span', { class: 'ev-title', text: d.title }));
+      p.style.left = '1px'; p.style.width = 'calc(100% - 6px)';
+      node.appendChild(p); paintEv(p, S.pvStart, S.pvStart + clamp(S.dur, 5, 1440));
+    } else {
+      p = el('div', { class: 'chip ghost-chip', data: { a: d.area } }, el('span', { class: 'dot' }), el('span', { class: 't', text: d.title }));
+      (node.classList.contains('inbox') ? node.querySelector('.inbox-list') : node).appendChild(p);
+      node.classList.add('drop-on');
+    }
+    p.offsetHeight; p.classList.add('in');
+    S.pv = { el: p, node: node };
+    return p;
+  }
+  function clearPv(S) {
+    var pv = S.pv; if (!pv) return;
+    S.pv = null;
+    pv.node.classList.remove('drop-on'); pv.el.classList.remove('in');
+    setTimeout(function () { pv.el.remove(); }, 200);
+  }
+  function flyTo(S, rectOf, done) {
+    var t0 = performance.now(), last = t0;
+    S.inner.style.scale = '1'; S.inner.style.opacity = '1'; S.tt = 0;
+    (function step(now) {
+      var r = rectOf(), k = 1 - Math.exp(-(now - last) / 55); last = now;
+      S.px += (r.left - S.px) * k; S.py += (r.top - S.py) * k; placeClone(S);
+      if (Math.abs(r.left - S.px) + Math.abs(r.top - S.py) < 1.2 || now - t0 > 450) done(); else requestAnimationFrame(step);
+    })(t0 + 16);
+  }
+  function finish(commit) {
+    var S = drag; if (!S || S.done) return;
+    S.done = true; cancelAnimationFrame(S.raf);
+    window.removeEventListener('pointermove', S.mv); window.removeEventListener('pointerup', S.up); window.removeEventListener('pointercancel', S.cancel);
+    window.removeEventListener('keydown', S.key, true); window.removeEventListener('touchmove', S.tm); window.removeEventListener('contextmenu', S.cm);
+    setTimeout(function () { window.removeEventListener('click', S.swallow, true); }, 80);
+    var t = S.tgt;
+    if (commit && t && t.kind === 'list' && S.isCard && S.phList === S.homeList && S.phRef === S.homeRef) commit = false;
+    function close(commitFn, fade) {
+      drag = null; dragId = null; document.body.classList.remove('is-dragging');
+      if (commitFn) { commitFn(); if (S.node.isConnected) render(); }
+      else {
+        if (S.ph) S.ph.remove();
+        S.node.classList.remove('drag-src'); clearPv(S);
+        if (needRender) render();
+      }
+      if (fade) { S.wrap.style.transition = 'opacity .14s'; S.wrap.style.opacity = '0'; setTimeout(function () { S.wrap.remove(); }, 160); }
+      else S.wrap.remove();
+    }
+    if (commit && t) {
+      var dz = t.node._dz;
+      if (t.kind === 'list') flyTo(S, function () { return S.ph.getBoundingClientRect(); }, function () {
+        var before = nextCard(S.ph); close(function () { dz.drop(S.id, before); }, false);
+      });
+      else if (t.kind === 'ev') close(function () { dz.drop(S.id, S.pvStart); }, true);
+      else close(function () { dz.drop(S.id); }, true);
+      return;
+    }
+    if (S.isCard) {
+      releaseList(S); S.inner.style.opacity = '1';
+      var home = S.homeList; placeAt(S, home, S.homeRef && S.homeRef.parentNode === home ? S.homeRef : null);
+      flyTo(S, function () { return S.ph.getBoundingClientRect(); }, function () { close(null, false); });
+    } else flyTo(S, function () { return S.node.getBoundingClientRect(); }, function () { close(null, false); });
   }
   function dueBadge(t) {
     if (!t.date) return null;
@@ -902,8 +1105,8 @@ main { padding-top: 14px; }
       });
       var list = el('div', { class: 'cards' });
       shown.forEach(function (t) { list.appendChild(cardNode(t)); });
-      dropZone(list, function (id, e) {
-        var before = beforeCard(list, e.clientY), order;
+      setDrop(list, function (id, before) {
+        var order;
         var ids = Array.prototype.map.call(list.querySelectorAll('.card'), function (c) { return c.dataset.id; }).filter(function (x) { return x !== id; });
         var orders = ids.map(function (x) { return index[x] ? (index[x].t.order || 0) : 0; });
         if (before) {
@@ -912,9 +1115,6 @@ main { padding-top: 14px; }
         } else order = orders.length ? orders[orders.length - 1] + 1000 : Date.now();
         var d = draftOf(id); if (!d) return;
         d.status = col.id; d.order = order; commitTask(d);
-      }, function (e) {
-        var before = beforeCard(list, e.clientY);
-        if (before) before.classList.add('drop-before'); else list.classList.add('drop-end');
       });
       var addBtn = el('button', { class: 'add-card', text: '+ Добавить карточку' });
       addBtn.addEventListener('click', function () {
@@ -946,11 +1146,6 @@ main { padding-top: 14px; }
     }
     inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') finish(true); if (e.key === 'Escape') finish(false); });
     inp.addEventListener('blur', function () { finish(true); });
-  }
-  function beforeCard(list, y) {
-    var cards = list.querySelectorAll('.card:not(.dragging)');
-    for (var i = 0; i < cards.length; i++) { var r = cards[i].getBoundingClientRect(); if (y < r.top + r.height / 2) return cards[i]; }
-    return null;
   }
   function cardNode(t) {
     var meta = el('div', { class: 'meta' });
@@ -1016,7 +1211,7 @@ main { padding-top: 14px; }
     var list = el('div', { class: 'inbox-list' });
     undated.forEach(function (t) { list.appendChild(chipNode(t)); });
     inbox.appendChild(list);
-    dropZone(inbox, function (id) { var d = draftOf(id); if (!d) return; d.date = null; d.start = null; d.end = null; commitTask(d); });
+    setDrop(inbox, function (id) { var d = draftOf(id); if (!d) return; d.date = null; d.start = null; d.end = null; commitTask(d); });
     wrap.appendChild(inbox);
     return wrap;
   }
@@ -1039,7 +1234,7 @@ main { padding-top: 14px; }
       items.slice(0, 3).forEach(function (t) { cell.appendChild(chipNode(t)); });
       if (items.length > 3) cell.appendChild(el('button', { class: 'more add-card', text: 'ещё ' + (items.length - 3),
         on: { click: function () { calDate = date; setMode('day'); } } }));
-      dropZone(cell, function (id) { var d = draftOf(id); if (!d) return; d.date = key; commitTask(d); });
+      setDrop(cell, function (id) { var d = draftOf(id); if (!d) return; d.date = key; commitTask(d); });
       grid.appendChild(cell);
     })(addDays(start, i));
     var hint = el('p', { class: 'hint', text: ui.showRoutine ? '' : 'Распорядок скрыт в месяце. Включите «Показывать распорядок» над доской.' });
@@ -1130,7 +1325,7 @@ main { padding-top: 14px; }
       items.filter(function (t) { return t.date === key && t.start == null; }).forEach(function (t) { cell.appendChild(chipNode(t)); });
       cell.appendChild(el('button', { class: 'add-day', title: 'Задача на весь день', 'aria-label': 'Добавить задачу на ' + key, text: '+',
         on: { click: function () { openNew({ date: key }); } } }));
-      dropZone(cell, function (id) { var d = draftOf(id); if (!d) return; d.date = key; d.start = null; d.end = null; commitTask(d); });
+      setDrop(cell, function (id) { var d = draftOf(id); if (!d) return; d.date = key; d.start = null; d.end = null; commitTask(d); });
       ad.appendChild(cell);
     });
     top.appendChild(ad);
@@ -1145,10 +1340,9 @@ main { padding-top: 14px; }
       lanesFor(items.filter(function (t) { return t.date === key && t.start != null; }))
         .forEach(function (r) { col.appendChild(evNode(r.t, r.lane, r.lanes, cols, keys)); });
       if (key === todayISO) col.appendChild(el('div', { class: 'now', style: 'top:' + (nowMin() * PPM) + 'px' }));
-      dropZone(col, function (id, e) {
+      setDrop(col, function (id, s) {
         var d = draftOf(id); if (!d) return;
-        var dur = d.start != null ? endOf(d) - d.start : (d.estimate || 60);
-        var s = clamp(snap(minAt(col, e.clientY), e.ctrlKey), 0, 1440 - dur);
+        var dur = clamp(d.start != null ? endOf(d) - d.start : (d.estimate || 60), 5, 1440);
         d.date = key; d.start = s; d.end = s + dur; commitTask(d);
       });
       col.addEventListener('pointerdown', function (e) {
