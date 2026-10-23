@@ -66,12 +66,16 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .brand { font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; }
 .brand i { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); display: inline-block; box-shadow: 0 0 0 4px var(--accent-soft); }
 .spacer { flex: 1 1 0; }
-.sync { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--col); white-space: nowrap; }
+.sync { border: 0; cursor: pointer; font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--col); white-space: nowrap; }
 .sync::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
 .sync[data-s="busy"]::before { background: var(--amber); }
 .sync[data-s="error"] { color: var(--warn); }
 .sync[data-s="error"]::before { background: var(--warn); }
 .sync[data-s="demo"]::before { background: var(--muted); }
+.setting { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.setting .hint { grid-column: 1 / -1; }
+.setting select, .setting input[type=text] { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); max-width: 190px; }
+.setting label { font-weight: 500; }
 .search { width: 190px; max-width: 100%; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .btn { border: 1px solid var(--line); background: var(--surface); padding: 7px 12px; border-radius: 8px; font-weight: 500; text-decoration: none; color: var(--fg); display: inline-flex; align-items: center; gap: 6px; }
 .btn:hover { border-color: var(--muted); }
@@ -254,7 +258,7 @@ main { padding-top: 14px; }
     <button class="tab" id="mt-board" aria-pressed="false">Доска</button>
   </div>
   <div class="spacer"></div>
-  <span class="sync" id="sync" hidden></span>
+  <button class="sync" id="sync" type="button" hidden></button>
   <input class="search" id="search" type="search" placeholder="Поиск по задачам" aria-label="Поиск по задачам" hidden>
   <button class="btn" id="btn-claude" hidden>АНАЛИЗ</button>
   <button class="btn primary" id="new-task" hidden>+ Задача</button>
@@ -341,6 +345,21 @@ main { padding-top: 14px; }
   tickToday();
 
   /* ---------- хранилища ---------- */
+  function hex(buf) { return Array.prototype.map.call(new Uint8Array(buf), function (b) { return b.toString(16).padStart(2, '0'); }).join(''); }
+  function blobSha(text) {
+    var body = new TextEncoder().encode(text), head = new TextEncoder().encode('blob ' + body.length + '\0');
+    var all = new Uint8Array(head.length + body.length); all.set(head); all.set(body, head.length);
+    return crypto.subtle.digest('SHA-1', all).then(hex);
+  }
+  function httpError(res, body) {
+    var e = new Error((body && body.message) || ('HTTP ' + res.status)); e.status = res.status;
+    if (res.status === 401) e.auth = true;
+    if (res.status === 403 && !/rate limit/i.test(e.message)) e.auth = true;
+    if (res.status === 409 || res.status === 422) e.conflict = true;
+    return e;
+  }
+  function netError(e) { var x = new Error('Нет связи с GitHub'); x.offline = true; x.cause = e; return x; }
+
   function GitHubBackend(cfg) { this.cfg = cfg; }
   GitHubBackend.prototype.base = function () {
     return 'https://api.github.com/repos/' + encodeURIComponent(this.cfg.owner) + '/' + encodeURIComponent(this.cfg.repo);
@@ -350,24 +369,22 @@ main { padding-top: 14px; }
     for (var k in extra) h[k] = extra[k];
     return h;
   };
-  GitHubBackend.prototype.fileUrl = function (p) { return this.base() + '/contents/' + p.split('/').map(encodeURIComponent).join('/'); };
-  function httpError(res, body) {
-    var e = new Error((body && body.message) || ('HTTP ' + res.status)); e.status = res.status;
-    if (res.status === 401) e.auth = true;
-    if (res.status === 403 && !/rate limit/i.test(e.message)) e.auth = true;
-    if (res.status === 409 || (res.status === 422 && /sha/i.test(e.message))) e.conflict = true;
-    return e;
-  }
-  GitHubBackend.prototype.check = function () {
-    var self = this;
-    return fetch(this.base(), { headers: this.headers(), cache: 'no-store' }).then(function (res) {
-      if (res.ok) return res.json().then(function (j) { if (!self.cfg.branch) self.cfg.branch = j.default_branch; return j; });
+  GitHubBackend.prototype.api = function (method, path, body) {
+    var opt = { method: method, headers: this.headers(body ? { 'Content-Type': 'application/json' } : {}), cache: 'no-store' };
+    if (body) opt.body = JSON.stringify(body);
+    return fetch(this.base() + path, opt).catch(function (e) { throw netError(e); }).then(function (res) {
+      if (res.ok) return res.json();
       return res.json().catch(function () { return null; }).then(function (b) { throw httpError(res, b); });
     });
   };
-  GitHubBackend.prototype.get = function (p, etag) {
+  GitHubBackend.prototype.check = function () {
+    var self = this;
+    return this.api('GET', '').then(function (j) { if (!self.cfg.branch) self.cfg.branch = j.default_branch; return j; });
+  };
+  GitHubBackend.prototype.get = function (p, etag, ref) {
     var h = etag ? { 'If-None-Match': etag } : {};
-    return fetch(this.fileUrl(p) + '?ref=' + encodeURIComponent(this.cfg.branch), { headers: this.headers(h), cache: 'no-store' }).then(function (res) {
+    var url = this.base() + '/contents/' + p.split('/').map(encodeURIComponent).join('/') + '?ref=' + encodeURIComponent(ref || this.cfg.branch);
+    return fetch(url, { headers: this.headers(h), cache: 'no-store' }).catch(function (e) { throw netError(e); }).then(function (res) {
       if (res.status === 304) return { notModified: true };
       if (res.status === 404) return { missing: true };
       if (!res.ok) return res.json().catch(function () { return null; }).then(function (b) { throw httpError(res, b); });
@@ -375,17 +392,33 @@ main { padding-top: 14px; }
       return res.json().then(function (j) { return { sha: j.sha, text: b64decode(j.content || ''), etag: et }; });
     });
   };
-  GitHubBackend.prototype.put = function (p, text, sha, message) {
-    var body = { message: message, content: b64encode(text), branch: this.cfg.branch };
-    if (sha) body.sha = sha;
-    return fetch(this.fileUrl(p), { method: 'PUT', headers: this.headers({ 'Content-Type': 'application/json' }), body: JSON.stringify(body) }).then(function (res) {
-      if (!res.ok) return res.json().catch(function () { return null; }).then(function (b) { throw httpError(res, b); });
-      return res.json().then(function (j) { return { sha: j.content.sha }; });
+  GitHubBackend.prototype.refPath = function () { return '/git/ref/heads/' + this.cfg.branch.split('/').map(encodeURIComponent).join('/'); };
+  GitHubBackend.prototype.head = function () {
+    var self = this;
+    return this.api('GET', this.refPath()).then(function (r) {
+      return self.api('GET', '/git/commits/' + r.object.sha).then(function (c) {
+        return { sha: c.sha, tree: c.tree.sha, parents: c.parents.map(function (x) { return x.sha; }), message: c.message || '' };
+      });
+    });
+  };
+  // Один коммит на все изменённые файлы. squash: заменить последний коммит (head) новым, сохранив его изменения.
+  GitHubBackend.prototype.commit = function (head, texts, message, squash) {
+    var self = this;
+    var entries = Object.keys(texts).map(function (p) { return { path: p, mode: '100644', type: 'blob', content: texts[p] }; });
+    return this.api('POST', '/git/trees', { base_tree: head.tree, tree: entries }).then(function (tree) {
+      return self.api('POST', '/git/commits', { message: message, tree: tree.sha, parents: squash ? head.parents : [head.sha] });
+    }).then(function (c) {
+      var guard = squash ? self.api('GET', self.refPath()).then(function (r) {
+        if (r.object.sha !== head.sha) { var e = new Error('Ветка изменилась'); e.conflict = true; throw e; }
+      }) : Promise.resolve();
+      return guard.then(function () {
+        return self.api('PATCH', '/git/refs/heads/' + self.cfg.branch, { sha: c.sha, force: !!squash });
+      }).then(function () { return { sha: c.sha }; });
     });
   };
 
   function DemoBackend() {
-    var mon = weekStartOf(weekId(today)), files = {}, n = 0;
+    var mon = weekStartOf(weekId(today)), files = {}, n = 0, self = this;
     function d(i) { return iso(addDays(mon, i)); }
     var wk = { week: weekId(today), start: iso(mon), tasks: [] };
     var routine = [['Сон', 'sleep', 0, 450], ['Завтрак', 'food', 485, 510], ['Обед', 'food', 780, 825], ['Ужин', 'food', 1140, 1180], ['Разобрать посуду', 'home', 1180, 1195]];
@@ -401,17 +434,28 @@ main { padding-top: 14px; }
       { id: 'i3', title: 'Разобрать почту', status: 'backlog', area: 'work', order: 3 }] });
     files[weekPath(wk.week)] = JSON.stringify(wk);
     files[P_REPORT] = 'Это демо. В настоящем режиме здесь отчёт последнего разбора Claude: что перенесено, что расставлено и что не влезло.';
-    this.files = files;
-    this.get = function (p) { return Promise.resolve(p in files ? { sha: 'v' + n, text: files[p] } : { missing: true }); };
-    this.put = function (p, text) { files[p] = text; n++; return Promise.resolve({ sha: 'v' + n }); };
+    this.log = [];
+    this.get = function (p) { return p in files ? blobSha(files[p]).then(function (s) { return { sha: s, text: files[p] }; }) : Promise.resolve({ missing: true }); };
+    this.head = function () { var last = self.log[self.log.length - 1]; return Promise.resolve({ sha: 'c' + n, tree: 't' + n, parents: ['c' + (n - 1)], message: last || '' }); };
+    this.commit = function (head, texts, message, squash) {
+      for (var p in texts) files[p] = texts[p];
+      if (squash) self.log.pop();
+      self.log.push(message); n++;
+      return Promise.resolve({ sha: 'c' + n });
+    };
   }
 
   /* ---------- состояние ---------- */
   var cfg = lsGet(CFG_KEY);
   var ui = lsGet(UI_KEY) || {};
+  var DEFAULT_SETTINGS = { idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
+    device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'телефон' : 'компьютер' };
+  var settings = Object.assign({}, DEFAULT_SETTINGS, ui.settings || {});
   var backend = null, demo = false;
   var files = {};
-  var queue = [], saving = false, saveTimer = null, syncErr = null, lastSync = null;
+  var actions = [];            // несохранённые действия: { at, lines: [...], ops: [...] }
+  var flushing = false, flushAgain = false, flushTimer = null, pollTimer = null, retryTimer = null;
+  var syncErr = null, lastSync = null, lastSubject = null;
   var index = {};
   var narrow = window.matchMedia('(max-width: 760px)');
   var mtab = 'cal';
@@ -421,6 +465,12 @@ main { padding-top: 14px; }
   var query = '';
   var dragId = null, interacting = false, needRender = false;
   var armTimers = {};
+
+  function saveSettings() { ui.settings = settings; lsSet(UI_KEY, ui); }
+  function repoKey() { return demo ? null : cfg.owner + '/' + cfg.repo + '@' + cfg.branch; }
+  function persistActions() { if (repoKey()) lsSet('tt-pending-v1:' + repoKey(), actions.length ? actions : null); }
+  function cacheKey(p) { return 'tt-cache-v1:' + repoKey() + ':' + p; }
+  function cacheSave(p) { if (repoKey() && files[p]) lsSet(cacheKey(p), { base: files[p].base, sha: files[p].sha }); }
 
   function isJsonPath(p) { return /\.json$/.test(p); }
   function defaultFor(p) {
@@ -449,109 +499,214 @@ main { padding-top: 14px; }
     return d;
   }
 
+  /* операции: сериализуемые, поэтому переживают перезагрузку и накладываются заново поверх свежих данных */
+  function applyOp(d, op) {
+    if (op.k === 'put') {
+      var t = null;
+      for (var i = 0; i < d.tasks.length; i++) if (d.tasks[i].id === op.id) { t = d.tasks[i]; break; }
+      if (t) Object.assign(t, clone(op.fields));
+      else d.tasks.push(Object.assign(clone(op.full), clone(op.fields)));
+    } else if (op.k === 'del') {
+      d.tasks = d.tasks.filter(function (x) { return x.id !== op.id; });
+    } else if (op.k === 'col') {
+      if (op.act === 'rename') d.columns.forEach(function (c) { if (c.id === op.id) c.title = op.title; });
+      else if (op.act === 'add') {
+        if (d.columns.some(function (c) { return c.id === op.col.id; })) return;
+        var di = d.columns.findIndex(function (c) { return c.done; });
+        d.columns.splice(di < 0 ? d.columns.length : di, 0, clone(op.col));
+      } else if (op.act === 'remove' && d.columns.length > 1) d.columns = d.columns.filter(function (c) { return c.id !== op.id; });
+    }
+  }
+  function opsFor(list, p) { var out = []; list.forEach(function (a) { a.ops.forEach(function (op) { if (op.path === p) out.push(op); }); }); return out; }
+  function recompute(p) {
+    var f = files[p];
+    f.data = clone(f.base);
+    if (isJsonPath(p)) opsFor(actions, p).forEach(function (op) { applyOp(f.data, op); });
+  }
+  function setBase(p, text, sha, etag) {
+    var f = files[p];
+    try { f.base = text == null ? defaultFor(p) : parseData(p, text); f.broken = false; }
+    catch (e) { f.broken = true; f.base = defaultFor(p); syncErr = { message: p + ': файл повреждён' }; }
+    f.sha = sha || null; f.etag = etag || null;
+    recompute(p); cacheSave(p);
+  }
+
   function ensureFile(p) {
     if (files[p]) return files[p];
-    var f = files[p] = { data: defaultFor(p), sha: null, etag: null, state: 'loading', pending: [], broken: false };
+    var c = repoKey() ? lsGet(cacheKey(p)) : null;
+    var f = files[p] = { base: c ? c.base : defaultFor(p), sha: c ? c.sha : null, etag: null, state: c ? 'cached' : 'loading', broken: false };
+    recompute(p);
     loadFile(p);
     return f;
   }
-  function applyPending(f) { f.pending.forEach(function (op) { op(f.data); }); }
   function loadFile(p) {
     var f = files[p];
-    f.state = 'loading'; setSync();
+    if (f.state !== 'cached') f.state = 'loading';
+    setSync();
     return backend.get(p).then(function (r) {
-      if (r.missing) { f.data = defaultFor(p); f.sha = null; f.etag = null; }
-      else {
-        try { f.data = parseData(p, r.text); f.broken = false; }
-        catch (e) { f.broken = true; f.data = defaultFor(p); syncErr = { message: p + ': файл повреждён, правки в него не сохраняются' }; }
-        f.sha = r.sha; f.etag = r.etag || null;
-      }
-      applyPending(f);
+      if (r.missing) setBase(p, null, null, null); else setBase(p, r.text, r.sha, r.etag);
       f.state = 'ready';
-      if (f.pending.length) queueSave(p);
+      if (syncErr && syncErr.offline) syncErr = null;
       softRender(); setSync();
     }).catch(function (e) {
-      f.state = 'error'; syncErr = e; setSync();
-      setTimeout(function () { if (files[p] === f) loadFile(p); }, 15000);
+      if (f.state !== 'cached') f.state = 'error';
+      syncErr = e; setSync();
+      if (!e.auth) setTimeout(function () { if (files[p] === f && f.state !== 'ready') loadFile(p); }, 20000);
     });
   }
-  function mutate(p, op) {
-    var f = ensureFile(p);
-    op(f.data);
-    f.pending.push(op);
-    queueSave(p);
+
+  function addAction(lines, ops) {
+    if (!lines.length && !ops.length) return;
+    ops.forEach(function (op) { ensureFile(op.path); applyOp(files[op.path].data, op); });
+    actions.push({ at: Date.now(), lines: lines, ops: ops });
+    persistActions();
+    scheduleFlush();
   }
-  function queueSave(p) {
-    if (queue.indexOf(p) < 0) queue.push(p);
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(runQueue, 400);
+
+  /* ---------- сохранение ---------- */
+  function editingNow() {
+    if (interacting || dragId || $('modal-root').firstChild) return true;
+    var a = document.activeElement;
+    return !!(a && $('view').contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName));
+  }
+  function scheduleFlush() {
+    clearTimeout(flushTimer);
+    if (actions.length && backend && settings.idle > 0) flushTimer = setTimeout(function () { flush('idle'); }, settings.idle * 1000);
     setSync();
   }
-  function commitMessage(p) {
-    var m = /weeks\/(.+)\.json$/.exec(p);
-    return 'site: ' + (m ? 'неделя ' + m[1] : p === P_INBOX ? 'inbox' : p === P_BOARD ? 'доска' : p);
-  }
-  function runQueue() {
-    if (saving || !backend) return;
-    saving = true; setSync();
-    var p = queue[0];
-    var done = function () { saving = false; setSync(); if (queue.length && !syncErr) saveTimer = setTimeout(runQueue, 50); };
-    if (!p) { saving = false; setSync(); return; }
-    var f = files[p];
-    if (!f || !f.pending.length || f.broken) { queue.shift(); return done(); }
-    if (f.state !== 'ready') { saving = false; setSync(); return; }
-    var n = f.pending.length;
-    backend.put(p, serialize(p, f.data), f.sha, commitMessage(p)).then(function (r) {
-      f.sha = r.sha; f.etag = null; f.pending.splice(0, n); f.retries = 0;
-      if (!f.pending.length) queue.shift();
+  function activity() { if (actions.length) scheduleFlush(); }
+  function flush(reason) {
+    if (!backend || !actions.length) return;
+    if (flushing) { flushAgain = true; return; }
+    if ((reason === 'idle' || reason === 'blur') && editingNow()) { scheduleFlush(); return; }
+    clearTimeout(flushTimer); clearTimeout(retryTimer);
+    flushing = true; setSync();
+    flushNow().then(function () {
       syncErr = null; lastSync = new Date();
-      done();
     }).catch(function (e) {
-      if (e.conflict && (f.retries = (f.retries || 0) + 1) <= 4) {
-        return backend.get(p).then(function (r) {
-          if (r.missing) { f.data = defaultFor(p); f.sha = null; }
-          else { f.data = parseData(p, r.text); f.sha = r.sha; }
-          applyPending(f); softRender(); done();
-        }).catch(function (e2) { syncErr = e2; done(); retryLater(); });
-      }
-      f.retries = 0; syncErr = e; done(); retryLater();
+      syncErr = e;
+      if (!e.auth && !e.offline) retryTimer = setTimeout(function () { flush('retry'); }, 30000);
+    }).then(function () {
+      flushing = false; setSync(); softRender();
+      if (flushAgain) { flushAgain = false; flush('again'); }
+      else if (actions.length) scheduleFlush();
     });
   }
-  function retryLater() { clearTimeout(saveTimer); saveTimer = setTimeout(function () { syncErr = null; runQueue(); }, 15000); }
+  function squashKey() {
+    var n = new Date();
+    return settings.squash === 'hour' ? 'h:' + iso(n) + 'T' + pad(n.getHours()) : 'd:' + iso(n);
+  }
+  function canSquash(head) {
+    return settings.squash !== 'off' && head.parents.length === 1 && head.message.indexOf('\nTT-Squash-Key: ' + squashKey()) >= 0;
+  }
+  function flushNow() {
+    var n = actions.length, batch = actions.slice(0, n), paths = [];
+    batch.forEach(function (a) { a.ops.forEach(function (op) { if (paths.indexOf(op.path) < 0) paths.push(op.path); }); });
+    var attempt = 0;
+    function tryOnce() {
+      attempt++;
+      return backend.head().then(function (head) {
+        // свежие версии изменённых файлов на вершине ветки: правки Claude и других устройств не потеряются
+        return Promise.all(paths.map(function (p) {
+          return backend.get(p, null, head.sha).then(function (r) {
+            ensureFile(p);
+            if (r.missing) { if (files[p].sha) setBase(p, null, null, null); }
+            else if (r.sha !== files[p].sha) setBase(p, r.text, r.sha, null);
+          });
+        })).then(function () { return head; });
+      }).then(function (head) {
+        var texts = {}, changed = false;
+        paths.forEach(function (p) {
+          var d = clone(files[p].base);
+          opsFor(batch, p).forEach(function (op) { applyOp(d, op); });
+          texts[p] = serialize(p, d);
+          if (texts[p] !== serialize(p, files[p].base) || !files[p].sha) changed = true;
+        });
+        if (!changed) return null;
+        var squash = canSquash(head);
+        var message = buildMessage(batch, squash ? head.message : null);
+        return backend.commit(head, texts, message, squash).then(function (res) {
+          lastSubject = message.split('\n')[0];
+          return Promise.all(paths.map(function (p) {
+            return blobSha(texts[p]).then(function (s) { files[p].base = parseData(p, texts[p]); files[p].sha = s; files[p].etag = null; });
+          }));
+        });
+      }).then(function () {
+        actions.splice(0, n);
+        persistActions();
+        paths.forEach(function (p) { recompute(p); cacheSave(p); });
+      }).catch(function (e) {
+        if (e.conflict && attempt < 4) return tryOnce();
+        throw e;
+      });
+    }
+    return tryOnce();
+  }
+
+  /* сообщение коммита: заголовок по классам действий, в теле по строке на действие */
+  function lineText(l) { return l.cls + ': ' + (l.text || ('«' + l.title + '» ' + l.from + ' → ' + l.to)); }
+  function buildMessage(batch, prevMsg) {
+    var merged = [], byKey = {};
+    batch.forEach(function (a) {
+      a.lines.forEach(function (l) {
+        if (l.from != null && l.id) {
+          var k = l.cls + '|' + l.id;
+          if (byKey[k]) { byKey[k].to = l.to; byKey[k].title = l.title; return; }
+          byKey[k] = Object.assign({}, l); merged.push(byKey[k]);
+        } else merged.push(l);
+      });
+    });
+    var lines = merged.filter(function (l) { return l.from == null || l.from !== l.to; }).map(lineText);
+    lines = lines.filter(function (l, i) { return lines.indexOf(l) === i; });
+    var prev = prevMsg ? prevMsg.split('\n').filter(function (l) { return /^- /.test(l); }).map(function (l) { return l.slice(2); }) : [];
+    var all = prev.concat(lines);
+    if (!all.length) all = ['правка: изменения без видимой разницы'];
+    var counts = {}, order = [];
+    all.forEach(function (l) { var c = l.split(':')[0]; if (!counts[c]) { counts[c] = 0; order.push(c); } counts[c]++; });
+    order.sort(function (a, b) { return counts[b] - counts[a]; });
+    var subject = 'TOTALTASK: ' + order.map(function (c) { return counts[c] > 1 ? c + ' ×' + counts[c] : c; }).join(', ');
+    if (subject.length > 100) subject = subject.slice(0, 99) + '…';
+    return subject + '\n\n' + all.slice(-400).map(function (l) { return '- ' + l; }).join('\n') +
+      '\n\nTT-Squash-Key: ' + squashKey() + '\nTT-Device: ' + (settings.device || 'устройство');
+  }
 
   function poll() {
-    if (!backend || demo || document.hidden) return;
+    if (!backend || demo || document.hidden || flushing) return;
     tickToday();
     Object.keys(files).forEach(function (p) {
       var f = files[p];
-      if (f.state !== 'ready' || f.pending.length || saving || queue.indexOf(p) >= 0) return;
+      if (f.state !== 'ready' && f.state !== 'cached') return;
       backend.get(p, f.etag).then(function (r) {
-        if (r.notModified) return;
-        if (f.pending.length || queue.indexOf(p) >= 0) return;
-        if (r.missing) { if (f.sha) { f.data = defaultFor(p); f.sha = null; softRender(); } return; }
+        if (r.notModified || flushing) return;
+        if (r.missing) { if (f.sha) { setBase(p, null, null, null); softRender(); } return; }
+        f.state = 'ready';
         if (r.sha === f.sha) { f.etag = r.etag; return; }
-        try { f.data = parseData(p, r.text); f.broken = false; } catch (e) { f.broken = true; return; }
-        f.sha = r.sha; f.etag = r.etag;
-        lastSync = new Date(); softRender(); setSync();
-      }).catch(function (e) { if (e.auth) { syncErr = e; setSync(); } });
+        setBase(p, r.text, r.sha, r.etag);   // свежие данные + поверх них несохранённые действия
+        softRender(); setSync();
+      }).catch(function (e) { if (e.auth || e.offline) { syncErr = e; setSync(); } });
     });
-    lastSync = lastSync || new Date();
   }
+  function schedulePoll() { clearInterval(pollTimer); pollTimer = setInterval(poll, Math.max(15, settings.poll) * 1000); }
 
+  function plural(n, a, b, c) { var m = n % 10, h = n % 100; return n + ' ' + (m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 12 || h > 14) ? b : c); }
   function setSync() {
     var s = $('sync');
     if (!backend) { s.hidden = true; return; }
     s.hidden = false;
     var loading = Object.keys(files).some(function (p) { return files[p].state === 'loading'; });
-    var pend = queue.length > 0 || saving;
-    if (demo) { s.dataset.s = 'demo'; s.textContent = 'Демо, без сохранения'; }
-    else if (syncErr && syncErr.auth) { s.dataset.s = 'error'; s.textContent = 'Нет доступа: проверьте токен'; }
-    else if (syncErr) { s.dataset.s = 'error'; s.textContent = pend ? 'Нет связи, правки ждут' : 'Ошибка: ' + (syncErr.message || 'сеть'); }
-    else if (pend) { s.dataset.s = 'busy'; s.textContent = 'Сохраняю…'; }
-    else if (loading) { s.dataset.s = 'busy'; s.textContent = 'Загружаю…'; }
-    else { s.dataset.s = 'ok'; s.textContent = 'Синхронизировано' + (lastSync ? ' ' + fmtTime.format(lastSync) : ''); }
+    var n = actions.length, pend = n ? 'не сохранено ' + plural(n, 'действие', 'действия', 'действий') : '';
+    var st, txt;
+    if (demo) { st = 'demo'; txt = 'Демо' + (n ? ', ' + pend : ', без сохранения в GitHub'); }
+    else if (syncErr && syncErr.auth) { st = 'error'; txt = 'Нет доступа: проверьте токен'; }
+    else if (flushing) { st = 'busy'; txt = 'Сохраняю…'; }
+    else if (syncErr && syncErr.offline) { st = 'error'; txt = 'Офлайн' + (n ? ', ' + pend : ''); }
+    else if (syncErr && n) { st = 'error'; txt = 'Ошибка сохранения, ' + pend; }
+    else if (n) { st = 'busy'; txt = cap(pend); }
+    else if (loading) { st = 'busy'; txt = 'Загружаю…'; }
+    else { st = 'ok'; txt = 'Сохранено' + (lastSync ? ' ' + fmtTime.format(lastSync) : ''); }
+    s.dataset.s = st; s.textContent = txt;
+    s.title = n ? 'Нажмите, чтобы сохранить сейчас' : (lastSubject ? 'Последний коммит: ' + lastSubject : 'Всё сохранено');
   }
-  window.addEventListener('beforeunload', function (e) { if (queue.length || saving) { e.preventDefault(); e.returnValue = ''; } });
 
   /* ---------- задачи ---------- */
   function board() { return ensureFile(P_BOARD).data; }
@@ -573,25 +728,60 @@ main { padding-top: 14px; }
     var q = query.toLowerCase();
     return t.title.toLowerCase().indexOf(q) >= 0 || (t.desc || '').toLowerCase().indexOf(q) >= 0;
   }
+  function posText(t) {
+    if (!t.date) return 'Inbox';
+    var d = parse(t.date);
+    return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + (t.start != null ? ' ' + hhmm(t.start) + '–' + hhmm(endOf(t)) : '');
+  }
+  function spanText(t) { return t.start != null ? hhmm(t.start) + '–' + hhmm(endOf(t)) : 'весь день'; }
+  function describeChange(prev, t, changed) {
+    var T = '«' + t.title + '»', out = [];
+    function has(k) { return changed.indexOf(k) >= 0; }
+    if (!prev) return [{ cls: 'создание', id: t.id, text: T + (t.date ? ' на ' + posText(t) : ' в Inbox') }];
+    if (has('status')) {
+      var to = colById(t.status), fr = colById(prev.status);
+      out.push({ cls: to && to.done ? 'выполнено' : fr && fr.done ? 'возврат' : 'статус', id: t.id, title: t.title,
+        from: fr ? fr.title : String(prev.status), to: to ? to.title : String(t.status) });
+    }
+    if (has('date')) out.push({ cls: 'перенос', id: t.id, title: t.title, from: posText(prev), to: posText(t) });
+    else if (has('start') || has('end')) out.push({ cls: 'время', id: t.id, title: t.title, from: spanText(prev), to: spanText(t) });
+    if (has('title')) out.push({ cls: 'правка', text: '«' + prev.title + '» → ' + T });
+    else if (has('desc')) out.push({ cls: 'правка', text: T + ': описание' });
+    var ps = [];
+    if (has('priority')) ps.push((prev.priority ? 'P' + prev.priority : 'без приоритета') + ' → ' + (t.priority ? 'P' + t.priority : 'без приоритета'));
+    if (has('estimate')) ps.push('оценка ' + (t.estimate ? t.estimate + ' мин' : 'снята'));
+    if (has('area')) ps.push('область ' + (areaName(t.area) || 'снята'));
+    if (has('pinned')) ps.push(t.pinned ? 'закреплена' : 'откреплена');
+    if (ps.length) out.push({ cls: 'параметры', text: T + ': ' + ps.join(', ') });
+    if (!out.length && has('order')) out.push({ cls: 'порядок', id: t.id, text: T });
+    return out;
+  }
   function commitTask(draft) {
     draft.updated = new Date().toISOString();
     if (draft.start == null) { draft.start = null; draft.end = null; }
-    var prev = index[draft.id] ? index[draft.id].path : null;
-    var next = pathForTask(draft);
-    var copy = clone(draft);
-    if (prev && prev !== next) mutate(prev, function (d) { d.tasks = d.tasks.filter(function (x) { return x.id !== copy.id; }); });
-    mutate(next, function (d) {
-      var i = -1;
-      for (var k = 0; k < d.tasks.length; k++) if (d.tasks[k].id === copy.id) { i = k; break; }
-      if (i < 0) d.tasks.push(clone(copy)); else d.tasks[i] = clone(copy);
-    });
+    var e = index[draft.id], prev = e ? e.t : null, prevPath = e ? e.path : null, next = pathForTask(draft);
+    var fields = {}, changed = [];
+    if (prev) {
+      Object.keys(Object.assign({}, prev, draft)).forEach(function (k) {
+        if (k === 'updated') return;
+        var a = prev[k] === undefined ? null : prev[k], b = draft[k] === undefined ? null : draft[k];
+        if (JSON.stringify(a) !== JSON.stringify(b)) { changed.push(k); fields[k] = b; }
+      });
+      if (!changed.length) { render(); return; }
+      fields.updated = draft.updated;
+    }
+    var ops = [];
+    if (prevPath && prevPath !== next) ops.push({ k: 'del', path: prevPath, id: draft.id });
+    ops.push({ k: 'put', path: next, id: draft.id, full: clone(draft), fields: prev && prevPath === next ? fields : {} });
+    addAction(describeChange(prev, draft, changed), ops);
     render();
   }
   function removeTask(id) {
     var e = index[id]; if (!e) return;
-    mutate(e.path, function (d) { d.tasks = d.tasks.filter(function (x) { return x.id !== id; }); });
+    addAction([{ cls: 'удаление', text: '«' + e.t.title + '»' }], [{ k: 'del', path: e.path, id: id }]);
     render();
   }
+  function boardAction(text, op) { op.k = 'col'; op.path = P_BOARD; addAction([{ cls: 'доска', text: text }], [op]); render(); }
   function draftOf(id) { var e = index[id]; return e ? clone(e.t) : null; }
   function newDraft(extra) {
     var t = { id: uid(), title: '', desc: '', status: columns()[0].id, date: null, start: null, end: null, priority: null, estimate: null,
@@ -697,7 +887,7 @@ main { padding-top: 14px; }
       title.addEventListener('change', function () {
         var v = title.value.trim(); if (!v) { title.value = col.title; return; }
         var id = col.id;
-        mutate(P_BOARD, function (d) { d.columns.forEach(function (c) { if (c.id === id) c.title = v; }); });
+        if (v !== col.title) boardAction('колонка «' + col.title + '» → «' + v + '»', { act: 'rename', id: id, title: v });
       });
       title.addEventListener('keydown', function (e) { if (e.key === 'Enter') title.blur(); });
       title.addEventListener('blur', function () { if (needRender) setTimeout(softRender, 0); });
@@ -707,8 +897,7 @@ main { padding-top: 14px; }
         arm(del, 'col' + col.id, 'Удалить?', function () {
           var id = col.id, first = cols[ci === 0 ? 1 : 0].id;
           all().filter(function (t) { return t.status === id; }).forEach(function (t) { var d = clone(t); d.status = first; commitTask(d); });
-          mutate(P_BOARD, function (d) { d.columns = d.columns.filter(function (c) { return c.id !== id; }); });
-          render();
+          boardAction('удалена колонка «' + col.title + '»', { act: 'remove', id: id });
         });
       });
       var list = el('div', { class: 'cards' });
@@ -738,8 +927,7 @@ main { padding-top: 14px; }
     ab.addEventListener('click', function () {
       inlineInput(ab, 'Название колонки', function (v) {
         var c = { id: 'c' + Date.now().toString(36), title: v };
-        mutate(P_BOARD, function (d) { var i = d.columns.findIndex(function (x) { return x.done; }); d.columns.splice(i < 0 ? d.columns.length : i, 0, clone(c)); });
-        render();
+        boardAction('новая колонка «' + v + '»', { act: 'add', col: c });
       });
     });
     boardEl.appendChild(el('div', { class: 'add-col' }, ab));
@@ -991,7 +1179,7 @@ main { padding-top: 14px; }
   }
 
   /* ---------- окна ---------- */
-  function closeModal() { $('modal-root').textContent = ''; document.removeEventListener('keydown', escHandler); if (needRender) softRender(); }
+  function closeModal() { $('modal-root').textContent = ''; document.removeEventListener('keydown', escHandler); if (needRender) softRender(); activity(); }
   function escHandler(e) { if (e.key === 'Escape') closeModal(); }
   function showModal(label, nodes, focusEl) {
     closeModal();
@@ -1087,15 +1275,56 @@ main { padding-top: 14px; }
     if (f.state === 'ready' && !demo) loadFile(P_REPORT).then(function () { var r = document.querySelector('.report'); if (r) r.textContent = files[P_REPORT].data || 'Отчёта пока нет.'; });
   }
   function settingsModal() {
-    var info = demo ? 'Сейчас открыто демо. Данные не сохраняются.' : 'Подключено: ' + cfg.owner + '/' + cfg.repo + ', ветка ' + cfg.branch + '.';
+    function sel(id, value, opts, onChange) {
+      var x = el('select', { id: id });
+      opts.forEach(function (o) { var op = el('option', { value: String(o[0]), text: o[1] }); if (String(o[0]) === String(value)) op.selected = true; x.appendChild(op); });
+      x.addEventListener('change', function () { onChange(x.value); saveSettings(); });
+      return x;
+    }
+    function chk(id, value, onChange) {
+      var x = el('input', { id: id, type: 'checkbox' }); x.checked = !!value;
+      x.addEventListener('change', function () { onChange(x.checked); saveSettings(); });
+      return x;
+    }
+    function row(label, id, control, hint) {
+      return el('div', { class: 'setting' }, el('label', { for: id, text: label }), control, hint ? el('p', { class: 'hint', text: hint }) : null);
+    }
+    var info = demo ? 'Сейчас открыто демо: «сохранения» идут в память страницы, не в GitHub.' : 'Подключено: ' + cfg.owner + '/' + cfg.repo + ', ветка ' + cfg.branch + '.';
+    var device = el('input', { id: 's-device', type: 'text', value: settings.device || '' });
+    device.addEventListener('change', function () { settings.device = device.value.trim() || DEFAULT_SETTINGS.device; saveSettings(); });
+    var saveNow = el('button', { class: 'btn primary', text: 'Сохранить сейчас', disabled: !actions.length });
+    saveNow.addEventListener('click', function () { closeModal(); flush('manual'); });
     var out = el('button', { class: 'btn danger', text: demo ? 'Выйти из демо' : 'Отключить это устройство' });
     out.addEventListener('click', function () {
-      arm(out, 'logout', demo ? 'Выйти?' : 'Токен удалится с устройства. Точно?', function () { lsSet(CFG_KEY, null); location.reload(); });
+      arm(out, 'logout', demo ? 'Выйти?' : 'Токен и несохранённое удалятся. Точно?', function () {
+        if (!demo) { lsSet('tt-pending-v1:' + repoKey(), null); Object.keys(files).forEach(function (p) { lsSet(cacheKey(p), null); }); }
+        lsSet(CFG_KEY, null); location.reload();
+      });
     });
+    var n = actions.length;
     showModal('Настройки', [
       el('h2', { text: 'Настройки' }), el('p', { class: 'hint', text: info }),
-      el('p', { class: 'hint', text: 'Токен хранится только в этом браузере. На другом устройстве подключитесь заново тем же токеном.' }),
-      el('div', { class: 'actions' }, out, el('span', { class: 'spacer' }), el('button', { class: 'btn', text: 'Закрыть', on: { click: closeModal } }))
+      el('p', { class: 'hint', text: n ? 'Не сохранено: ' + plural(n, 'действие', 'действия', 'действий') + '. Они хранятся в этом браузере и не пропадут при закрытии вкладки.'
+        : 'Всё сохранено.' + (lastSubject ? ' Последний коммит: ' + lastSubject : '') }),
+      row('Сохранять после паузы', 's-idle', sel('s-idle', settings.idle,
+        [[15, '15 секунд'], [30, '30 секунд'], [60, '1 минута'], [120, '2 минуты'], [300, '5 минут'], [600, '10 минут'], [0, 'Не сохранять по паузе']],
+        function (v) { settings.idle = +v; scheduleFlush(); }),
+        'Пока вы двигаете, пишете или держите открытым окно задачи, ничего не отправляется. Отсчёт начинается с последнего действия.'),
+      row('Сохранять при уходе со вкладки', 's-hide', chk('s-hide', settings.onHide, function (v) { settings.onHide = v; }),
+        'Переключились на другую вкладку, свернули браузер или заблокировали телефон.'),
+      row('Сохранять при потере фокуса окна', 's-blur', chk('s-blur', settings.onBlur, function (v) { settings.onBlur = v; }),
+        'Переключились в другую программу, а вкладка осталась на экране.'),
+      row('Объединять коммиты', 's-squash', sel('s-squash', settings.squash,
+        [['off', 'Нет, каждое сохранение отдельно'], ['hour', 'За час'], ['day', 'За день']],
+        function (v) { settings.squash = v; }),
+        'Новое сохранение заменяет предыдущий коммит сайта за этот час или день, если после него никто ничего не коммитил. История остаётся короткой, все действия перечислены в одном сообщении.'),
+      row('Проверять изменения', 's-poll', sel('s-poll', settings.poll,
+        [[30, 'Раз в 30 секунд'], [60, 'Раз в минуту'], [300, 'Раз в 5 минут']],
+        function (v) { settings.poll = +v; schedulePoll(); }),
+        'Как часто подтягивать правки Claude и других устройств. Также проверяется при возврате на вкладку.'),
+      row('Имя устройства', 's-device', device, 'Пишется в коммит, чтобы было видно, откуда правка.'),
+      el('div', { class: 'actions' }, saveNow, el('span', { class: 'spacer' }), out,
+        el('button', { class: 'btn', text: 'Закрыть', on: { click: closeModal } }))
     ]);
   }
 
@@ -1132,10 +1361,14 @@ main { padding-top: 14px; }
     ['sync', 'search', 'btn-claude', 'new-task', 'btn-settings'].forEach(function (id) { $(id).hidden = true; });
   }
   function start(b, isDemo) {
-    backend = b; demo = isDemo; files = {}; queue = []; syncErr = null;
+    backend = b; demo = isDemo; files = {}; syncErr = null;
+    actions = repoKey() ? (lsGet('tt-pending-v1:' + repoKey()) || []) : [];
     ['search', 'btn-claude', 'new-task', 'btn-settings'].forEach(function (id) { $(id).hidden = false; });
     ensureFile(P_BOARD); ensureFile(P_INBOX); ensureFile(P_REPORT);
+    actions.forEach(function (a) { a.ops.forEach(function (op) { ensureFile(op.path); }); });
     render();
+    schedulePoll();
+    scheduleFlush();
   }
 
   /* ---------- оболочка ---------- */
@@ -1147,13 +1380,25 @@ main { padding-top: 14px; }
   $('btn-claude').addEventListener('click', claudeModal);
   $('btn-settings').addEventListener('click', settingsModal);
   $('search').addEventListener('input', function (e) { query = e.target.value.trim(); render(); });
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
-  setInterval(poll, 60000);
+  $('sync').addEventListener('click', function () { if (actions.length) flush('manual'); else poll(); });
+  ['pointerdown', 'keydown', 'input'].forEach(function (t) { document.addEventListener(t, activity, true); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) { if (settings.onHide) flush('hide'); } else poll();
+  });
+  window.addEventListener('pagehide', function () { if (settings.onHide) flush('hide'); });
+  window.addEventListener('blur', function () { if (settings.onBlur) flush('blur'); });
+  window.addEventListener('online', function () {
+    if (!backend) return;
+    syncErr = null;
+    Object.keys(files).forEach(function (p) { if (files[p].state !== 'ready') loadFile(p); });
+    flush('online');
+  });
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function () {});
   setInterval(function () { var d = todayISO; tickToday(); if (d !== todayISO) softRender(); else { var n = document.querySelector('.now'); if (n) n.style.top = (nowMin() * PPM) + 'px'; } }, 60000);
   setTop();
   if (cfg && cfg.token && cfg.branch) start(new GitHubBackend(cfg), false);
   else render();
-  window.__tt = { files: function () { return files; }, queue: function () { return queue; } };
+  window.__tt = { files: function () { return files; }, actions: function () { return actions; }, flush: flush, backend: function () { return backend; } };
 })();
 </script>
 </body>
