@@ -1065,6 +1065,18 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   }
   function setPv(S, kind, node) {
     if (S.pv && S.pv.node === node) return S.pv.el;
+    if (kind === 'ev' && S.pv && S.pv.kind === 'ev') {
+      var q = S.pv.el, first = q.getBoundingClientRect();
+      q.getAnimations().forEach(function (a) { a.cancel(); });
+      q.style.transition = 'none';
+      node.appendChild(q); paintEv(q, S.pvStart, S.pvStart + clamp(S.dur, 5, 1440));
+      var last = q.getBoundingClientRect();
+      q.offsetHeight; q.style.transition = '';
+      if (settings.slide > 0) q.animate([{ transform: 'translate(' + (first.left - last.left) + 'px,' + (first.top - last.top) + 'px)' }, { transform: 'none' }],
+        { duration: settings.slide, easing: 'cubic-bezier(.22,.8,.2,1)' });
+      S.pv.node = node;
+      return q;
+    }
     clearPv(S);
     var p, d = S.d0;
     if (kind === 'ev') {
@@ -1077,7 +1089,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       node.classList.add('drop-on');
     }
     p.offsetHeight; p.classList.add('in');
-    S.pv = { el: p, node: node };
+    S.pv = { el: p, node: node, kind: kind };
     return p;
   }
   function clearPv(S) {
