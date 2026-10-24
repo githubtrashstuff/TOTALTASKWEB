@@ -138,9 +138,16 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .card[data-a] { background: var(--abg); border-left: 3px solid var(--afg); padding-left: 10px; }
 .card[data-a] .card-title { color: var(--afg); }
 .card[data-a].done .card-title { color: var(--muted); }
-.card.has-cc, .chip.has-cc { background: color-mix(in srgb, var(--cc) 40%, var(--surface)); border-color: color-mix(in srgb, var(--cc) 70%, var(--line)); border-left: 3px solid var(--cc); }
+.card.has-cc, .chip.has-cc { --fill: color-mix(in srgb, var(--cc) 80%, var(--surface)); background: var(--fill); color: var(--ct);
+  border-color: color-mix(in srgb, var(--cc) 85%, #000); border-left: 3px solid color-mix(in srgb, var(--cc), #000 25%); }
+@supports (color: oklch(from red l c h)) {
+  .card.has-cc, .chip.has-cc, .ev.has-cc { --fill: oklch(from var(--cc) calc(l * 1.04) calc(c * 1.25) h / .8); }
+}
 .card.has-cc { padding-left: 10px; }
-.ev.has-cc { --abg: color-mix(in srgb, var(--cc) 40%, var(--surface)); --afg: var(--fg); border-left-color: var(--cc); }
+.card.has-cc .card-title { color: var(--ct); }
+.card.has-cc .meta > span:not(.lb):not(.over) { color: var(--ct); opacity: .85; }
+.has-cc .st:not(.wip):not(.done) { border-color: var(--ct); }
+.ev.has-cc { --abg: var(--fill, color-mix(in srgb, var(--cc) 80%, var(--surface))); --afg: var(--ct); border-left-color: color-mix(in srgb, var(--cc), #000 25%); }
 .ctx { position: fixed; z-index: 60; width: 272px; max-height: calc(100dvh - 16px); overflow: auto; background: var(--surface); border: 1px solid var(--line);
   border-radius: 12px; padding: 6px; box-shadow: 0 12px 32px rgb(0 0 0 / .28); font-size: 13px; display: flex; flex-direction: column; gap: 2px; }
 .ctx-sec { padding: 6px 8px; display: flex; flex-direction: column; gap: 6px; }
@@ -1071,6 +1078,21 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       if (Math.abs(r.left - S.px) + Math.abs(r.top - S.py) < 1.2 || now - t0 > 450) done(); else requestAnimationFrame(step);
     })(t0 + 16);
   }
+  function flyInto(S, rectOf, done) {
+    var dur = settings.slide;
+    if (dur <= 0) { done(); return; }
+    var inner = S.inner, w0 = S.wrap.offsetWidth, h0 = S.wrap.offsetHeight, x0 = S.px, y0 = S.py, t0 = 0;
+    inner.style.transition = 'none'; inner.style.opacity = '1'; inner.style.scale = '1'; S.tt = 0; inner.offsetHeight;
+    inner.style.transition = 'opacity ' + dur + 'ms ease-in, scale .18s'; inner.style.opacity = '0.15';
+    requestAnimationFrame(function step(now) {
+      if (!t0) t0 = now;
+      var k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3), r = rectOf();
+      S.px = x0 + (r.left - x0) * e; S.py = y0 + (r.top - y0) * e;
+      S.wrap.style.width = (w0 + (r.width - w0) * e) + 'px'; S.wrap.style.height = (h0 + (r.height - h0) * e) + 'px';
+      placeClone(S);
+      if (k < 1) requestAnimationFrame(step); else done();
+    });
+  }
   function finish(commit) {
     var S = drag; if (!S || S.done) return;
     S.done = true; cancelAnimationFrame(S.raf);
@@ -1095,8 +1117,11 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       if (t.kind === 'list') flyTo(S, function () { return S.ph.getBoundingClientRect(); }, function () {
         var before = nextCard(S.ph); close(function () { dz.drop(S.id, before); }, false);
       });
-      else if (t.kind === 'ev') close(function () { dz.drop(S.id, S.pvStart); }, true);
-      else close(function () { dz.drop(S.id); }, true);
+      else {
+        var pvEl = S.pv && S.pv.el, rectOf = function () { return pvEl.getBoundingClientRect(); };
+        var go = t.kind === 'ev' ? function () { dz.drop(S.id, S.pvStart); } : function () { dz.drop(S.id); };
+        if (pvEl) flyInto(S, rectOf, function () { close(go, false); }); else close(go, true);
+      }
       return;
     }
     if (S.isCard) {
@@ -1117,7 +1142,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   function toggled(arr, v) { var i = arr.indexOf(v), r = arr.slice(); if (i >= 0) r.splice(i, 1); else r.push(v); return r; }
   function paintCard(node, t) {
     if (!t.color) return;
-    node.classList.add('has-cc'); node.style.setProperty('--cc', colorHex(t.color));
+    var h = colorHex(t.color), lum = (0.299 * parseInt(h.substr(1, 2), 16) + 0.587 * parseInt(h.substr(3, 2), 16) + 0.114 * parseInt(h.substr(5, 2), 16)) / 255;
+    node.classList.add('has-cc'); node.style.setProperty('--cc', h); node.style.setProperty('--ct', lum > 0.62 ? '#1b1b1b' : '#fff');
   }
   function colorPicker(cur, onSet, single) {
     var box = el('div', { class: 'sw-row' });
