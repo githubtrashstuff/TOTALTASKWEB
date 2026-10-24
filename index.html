@@ -259,7 +259,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .tg-gutter { position: relative; }
 .tg-gutter span { position: absolute; right: 6px; font-size: 11px; color: var(--muted); transform: translateY(-50%); font-variant-numeric: tabular-nums; }
 .tg-col { position: relative; border-left: 1px solid var(--line); min-width: 0;
-  background-image: repeating-linear-gradient(to bottom, var(--line) 0, var(--line) 1px, transparent 1px, transparent 60px); }
+  background-image: repeating-linear-gradient(to bottom, var(--line) 0, var(--line) 1px, transparent 1px, transparent var(--hr, 60px)); }
 .now { position: absolute; left: 0; right: 0; height: 2px; background: var(--accent); z-index: 3; pointer-events: none; }
 .now::before { content: ""; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .ev { position: absolute; z-index: 2; border: 1px solid var(--line); border-left: 3px solid var(--afg, var(--muted)); border-radius: 6px;
@@ -536,7 +536,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   /* ---------- состояние ---------- */
   var cfg = lsGet(CFG_KEY);
   var ui = lsGet(UI_KEY) || {};
-  var DEFAULT_SETTINGS = { layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
+  PPM = clamp(+ui.ppm || 1, 0.4, 4);
+  var DEFAULT_SETTINGS = { wheelZoom: true, layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
     device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'телефон' : 'компьютер' };
   var settings = Object.assign({}, DEFAULT_SETTINGS, ui.settings || {});
   document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms');
@@ -550,7 +551,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   var mtab = 'cal';
   var calMode = narrow.matches ? 'day' : '3d';
   var calDate = new Date(today);
-  var gridScroll = Math.max(390, nowMin() - 120);
+  var gridScroll = Math.max(390, nowMin() - 120) * PPM;
   var query = '';
   var dragId = null, interacting = false, needRender = false;
   var armTimers = {};
@@ -1476,7 +1477,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var next = el('button', { class: 'btn', 'aria-label': 'Вперёд', text: '→', on: { click: function () { shift(1); } } });
     var tod = el('button', { class: 'btn', text: 'Сегодня', on: { click: function () {
       calDate = calMode === 'month' ? new Date(today.getFullYear(), today.getMonth(), 1) : new Date(today);
-      gridScroll = Math.max(390, nowMin() - 120); render();
+      gridScroll = Math.max(390, nowMin() - 120) * PPM; render();
     } } });
     var modes = el('div', { class: 'tabs modes' });
     [['month', 'Месяц'], ['3d', '3 дня'], ['day', 'День']].forEach(function (m) {
@@ -1657,6 +1658,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     for (var i = 0; i < n; i++) { var d = addDays(calDate, i); days.push(d); keys.push(iso(d)); }
     var tpl = '44px repeat(' + n + ', minmax(0, 1fr))';
     var scroller = el('div', { class: 'tg' });
+    scroller.style.setProperty('--hr', (60 * PPM) + 'px');
     var top = el('div', { class: 'tg-top' });
     var head = el('div', { class: 'tg-row', style: 'grid-template-columns:' + tpl }, el('div'));
     days.forEach(function (d, i) {
@@ -1676,6 +1678,19 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     });
     top.appendChild(ad);
     scroller.appendChild(top);
+    var zoomRaf = 0;
+    scroller.addEventListener('wheel', function (e) {
+      if (!(settings.wheelZoom ? !e.altKey : e.ctrlKey)) return;
+      if (interacting || dragId || $('modal-root').firstChild) return;
+      e.preventDefault();
+      var dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+      var r = scroller.getBoundingClientRect(), topH = top.offsetHeight, yy = e.clientY - r.top;
+      var m = ((zoomRaf ? gridScroll : scroller.scrollTop) + yy - topH) / PPM;
+      PPM = clamp(PPM * Math.exp(-dy * 0.0015), 0.4, 4);
+      ui.ppm = PPM; lsSet(UI_KEY, ui);
+      gridScroll = Math.max(0, m * PPM + topH - yy);
+      if (!zoomRaf) zoomRaf = requestAnimationFrame(function () { zoomRaf = 0; render(); });
+    }, { passive: false });
     var body = el('div', { class: 'tg-body', style: 'grid-template-columns:' + tpl });
     var gut = el('div', { class: 'tg-gutter', style: 'height:' + (1440 * PPM) + 'px' });
     for (var h = 1; h < 24; h++) gut.appendChild(el('span', { text: pad(h) + ':00', style: 'top:' + (h * 60 * PPM) + 'px' }));
@@ -1875,6 +1890,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       el('h2', { text: 'Настройки' }), el('p', { class: 'hint', text: info }),
       el('p', { class: 'hint', text: n ? 'Не сохранено: ' + plural(n, 'действие', 'действия', 'действий') + '. Они хранятся в этом браузере и не пропадут при закрытии вкладки.'
         : 'Всё сохранено.' + (lastSubject ? ' Последний коммит: ' + lastSubject : '') }),
+      row('Колесо мыши в календаре', 's-wheel', sel('s-wheel', settings.wheelZoom ? '1' : '0', [['1', 'Масштаб времени (Alt — прокрутка)'], ['0', 'Прокрутка (Ctrl — масштаб)']],
+        function (v) { settings.wheelZoom = v === '1'; }), 'Масштаб растягивает сетку дня по вертикали вокруг курсора.'),
       row('Календарь', 's-layout', sel('s-layout', settings.layout, [['left', 'Слева, канбан справа'], ['right', 'Справа, канбан слева']],
         function (v) { settings.layout = v; $('view').dataset.layout = v; }), 'Расположение двух частей на широком экране.'),
       row('Скольжение между днями', 's-slide', msCtl('s-slide', 'slide', 2000, 100),
