@@ -536,7 +536,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   /* ---------- состояние ---------- */
   var cfg = lsGet(CFG_KEY);
   var ui = lsGet(UI_KEY) || {};
-  PPM = clamp(+ui.ppm || 1, 0.4, 4);
+  PPM = clamp(+ui.ppm || 1, 0.4, 8);
   var DEFAULT_SETTINGS = { wheelZoom: true, layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
     device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'телефон' : 'компьютер' };
   var settings = Object.assign({}, DEFAULT_SETTINGS, ui.settings || {});
@@ -1679,6 +1679,16 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     top.appendChild(ad);
     scroller.appendChild(top);
     var zoomRaf = 0;
+    scroller.addEventListener('contextmenu', function (e) { if (!e.target.closest('.ev, .chip')) e.preventDefault(); });
+    scroller.addEventListener('pointerdown', function (e) {
+      if (e.button !== 2 || e.target.closest('.ev, .chip, .add-day, .tg-top')) return;
+      e.preventDefault();
+      var y0 = e.clientY, st0 = scroller.scrollTop;
+      document.body.classList.add('is-dragging');
+      function mv(ev) { scroller.scrollTop = st0 - (ev.clientY - y0); gridScroll = scroller.scrollTop; }
+      function up() { document.body.classList.remove('is-dragging'); window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); }
+      window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+    });
     scroller.addEventListener('wheel', function (e) {
       if (!(settings.wheelZoom ? !e.altKey : e.ctrlKey)) return;
       if (interacting || dragId || $('modal-root').firstChild) return;
@@ -1686,7 +1696,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       var dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
       var r = scroller.getBoundingClientRect(), topH = top.offsetHeight, yy = e.clientY - r.top;
       var m = ((zoomRaf ? gridScroll : scroller.scrollTop) + yy - topH) / PPM;
-      PPM = clamp(PPM * Math.exp(-dy * 0.0015), 0.4, 4);
+      PPM = clamp(PPM * Math.exp(-dy * 0.0015), 0.4, 8);
       ui.ppm = PPM; lsSet(UI_KEY, ui);
       gridScroll = Math.max(0, m * PPM + topH - yy);
       if (!zoomRaf) zoomRaf = requestAnimationFrame(function () { zoomRaf = 0; render(); });
