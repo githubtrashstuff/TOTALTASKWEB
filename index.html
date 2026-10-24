@@ -124,7 +124,40 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   transition: max-height .16s ease, margin-top .16s ease, padding .16s ease, opacity .16s ease; }
 .ghost-chip.in { max-height: 34px; margin-top: 0; padding-block: 3px; border-width: 1px; opacity: 1; }
 .ghost-chip .dot { background: var(--accent); }
-.card-title { font-weight: 500; overflow-wrap: anywhere; }
+.card-head { display: flex; align-items: flex-start; gap: 8px; }
+.card-title { font-weight: 500; overflow-wrap: anywhere; flex: 1; min-width: 0; }
+.lbls { display: flex; flex-wrap: wrap; gap: 4px; }
+.lbl { width: 34px; height: 6px; border-radius: 3px; background: var(--c); }
+.st { flex: none; width: 18px; height: 18px; margin-top: 1px; border-radius: 50%; border: 2px solid var(--muted); box-sizing: border-box;
+  display: inline-grid; place-items: center; cursor: pointer; color: #fff; font-size: 11px; font-weight: 700; line-height: 1; transition: border-color .15s, background .15s; }
+.st:hover { border-color: var(--fg); }
+.st.wip { border-color: #3E63DD; background: conic-gradient(#3E63DD 0 50%, transparent 0); }
+.st.done { border-color: #30A46C; background: #30A46C; }
+.st.done::after { content: "✓"; }
+.ic-badge { font-size: 13px; line-height: 1; }
+.chip.has-c { border-left: 3px solid var(--c); }
+.ctx { position: fixed; z-index: 60; width: 272px; max-height: calc(100dvh - 16px); overflow: auto; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 6px; box-shadow: 0 12px 32px rgb(0 0 0 / .28); font-size: 13px; display: flex; flex-direction: column; gap: 2px; }
+.ctx-sec { padding: 6px 8px; display: flex; flex-direction: column; gap: 6px; }
+.ctx-lab, .flabel { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.ctx hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; width: 100%; }
+.ctx-pills { display: flex; flex-wrap: wrap; gap: 4px; }
+.pill { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 3px 9px; font-size: 12px; color: var(--fg); }
+.pill:hover { border-color: var(--muted); }
+.pill.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.ctx-item { border: 0; background: transparent; text-align: left; padding: 7px 8px; border-radius: 8px; display: flex; gap: 10px; align-items: center; width: 100%; color: var(--fg); }
+.ctx-item:hover { background: var(--col); }
+.ctx-item.danger { color: var(--warn); }
+.ctx-item.armed { background: var(--warn); color: var(--surface); }
+.ctx-item .st { margin: 0; cursor: inherit; }
+.sw-row { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+.sw { height: 22px; border-radius: 6px; border: 0; background: var(--c); position: relative; cursor: pointer; padding: 0; }
+.sw:hover { filter: brightness(1.12); }
+.sw.on::after { content: "✓"; color: #fff; font-size: 13px; font-weight: 700; position: absolute; inset: 0; display: grid; place-items: center; }
+.ic-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; }
+.ic { border: 0; background: transparent; border-radius: 6px; height: 28px; font-size: 16px; padding: 0; }
+.ic:hover { background: var(--col); }
+.ic.on { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
 .card.done .card-title { text-decoration: line-through; color: var(--muted); }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .lb { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; }
@@ -762,6 +795,9 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (has('estimate')) ps.push('оценка ' + (t.estimate ? t.estimate + ' мин' : 'снята'));
     if (has('area')) ps.push('область ' + (areaName(t.area) || 'снята'));
     if (has('pinned')) ps.push(t.pinned ? 'закреплена' : 'откреплена');
+    if (has('wip')) ps.push(t.wip ? 'в процессе' : 'не в процессе');
+    if (has('colors')) ps.push('цвета');
+    if (has('icons')) ps.push('значки');
     if (ps.length) out.push({ cls: 'параметры', text: T + ': ' + ps.join(', ') });
     if (!out.length && has('order')) out.push({ cls: 'порядок', id: t.id, text: T });
     return out;
@@ -858,7 +894,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     node.addEventListener('pointerdown', function (e) { dragDown(e, node, id); });
   }
   function dragDown(e, node, id) {
-    if (drag || dragId || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if (drag || dragId || (e.pointerType === 'mouse' && e.button !== 0) || (e.target.closest && e.target.closest('.st'))) return;
     var touch = e.pointerType !== 'mouse', pid = e.pointerId, x0 = e.clientX, y0 = e.clientY, timer = null;
     function off() {
       clearTimeout(timer);
@@ -1059,6 +1095,130 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       flyTo(S, function () { return S.ph.getBoundingClientRect(); }, function () { close(null, false); });
     } else flyTo(S, function () { return S.node.getBoundingClientRect(); }, function () { close(null, false); });
   }
+  /* ---------- цвета, значки, контекстное меню ---------- */
+  var COLORS = [
+    { id: 'red', name: 'Красный', hex: '#E5484D' }, { id: 'orange', name: 'Оранжевый', hex: '#F76B15' },
+    { id: 'yellow', name: 'Жёлтый', hex: '#F5B800' }, { id: 'green', name: 'Зелёный', hex: '#30A46C' },
+    { id: 'teal', name: 'Бирюзовый', hex: '#12A594' }, { id: 'blue', name: 'Синий', hex: '#3E63DD' },
+    { id: 'purple', name: 'Фиолетовый', hex: '#8E4EC6' }, { id: 'pink', name: 'Розовый', hex: '#D6409F' }
+  ];
+  var ICONS = ['⭐', '🔥', '⚡', '🚩', '💡', '🔔', '📌', '🔒', '❤️', '💬', '🛒', '💰', '📞', '🎯', '⚠️', '🎁', '📅', '✈️', '🏠', '💪', '📚', '🧹', '🍽️', '😴'];
+  function colorHex(id) { for (var i = 0; i < COLORS.length; i++) if (COLORS[i].id === id) return COLORS[i].hex; return '#888'; }
+  function toggled(arr, v) { var i = arr.indexOf(v), r = arr.slice(); if (i >= 0) r.splice(i, 1); else r.push(v); return r; }
+  function colorPicker(cur, onSet) {
+    var box = el('div', { class: 'sw-row' });
+    (function paint() {
+      box.textContent = '';
+      COLORS.forEach(function (c) {
+        var on = cur.indexOf(c.id) >= 0, b = el('button', { type: 'button', class: 'sw' + (on ? ' on' : ''), title: c.name, 'aria-label': c.name, 'aria-pressed': String(on) });
+        b.style.setProperty('--c', c.hex);
+        b.addEventListener('click', function () { cur = toggled(cur, c.id); onSet(cur); paint(); });
+        box.appendChild(b);
+      });
+    })();
+    return box;
+  }
+  function iconPicker(cur, onSet) {
+    var box = el('div', { class: 'ic-grid' });
+    (function paint() {
+      box.textContent = '';
+      ICONS.forEach(function (ic) {
+        var on = cur.indexOf(ic) >= 0, b = el('button', { type: 'button', class: 'ic' + (on ? ' on' : ''), text: ic, 'aria-pressed': String(on) });
+        b.addEventListener('click', function () { cur = toggled(cur, ic); onSet(cur); paint(); });
+        box.appendChild(b);
+      });
+    })();
+    return box;
+  }
+  function stateOf(t) { return isDone(t) ? 'done' : t.wip ? 'wip' : 'todo'; }
+  function setState(id, st) {
+    var d = draftOf(id); if (!d) return;
+    var dc = columns().filter(function (c) { return c.done; })[0], nc = columns().filter(function (c) { return !c.done; })[0];
+    if (st === 'done') { if (dc) d.status = dc.id; delete d.wip; }
+    else { if (isDone(d) && nc) d.status = nc.id; if (st === 'wip') d.wip = true; else delete d.wip; }
+    commitTask(d);
+  }
+  var STATE_TITLE = { todo: 'Не начато', wip: 'В процессе', done: 'Выполнено' };
+  function stBtn(t) {
+    var st = stateOf(t), b = el('span', { class: 'st ' + st, role: 'button', title: STATE_TITLE[st] + ' (нажмите, чтобы сменить)' });
+    b.addEventListener('click', function (e) { e.stopPropagation(); setState(t.id, st === 'todo' ? 'wip' : st === 'wip' ? 'done' : 'todo'); });
+    return b;
+  }
+  function presetDate(kind) {
+    var dow = (today.getDay() + 6) % 7;
+    var n = { today: 0, tomorrow: 1, week: dow === 6 ? 7 : 6 - dow, next: 7 }[kind];
+    return iso(addDays(today, n));
+  }
+  var ctxEl = null, ctxOff = null;
+  function closeCtx() {
+    if (!ctxEl) return;
+    ctxEl.remove(); ctxEl = null; if (ctxOff) ctxOff(); ctxOff = null;
+  }
+  function ctxMenu(e, id) {
+    e.preventDefault(); e.stopPropagation();
+    closeCtx();
+    var menu = ctxEl = el('div', { class: 'ctx', role: 'menu' });
+    function item(label, fn, cls, lead) {
+      var b = el('button', { type: 'button', class: 'ctx-item' + (cls ? ' ' + cls : ''), role: 'menuitem' }, lead || null, el('span', { text: label }));
+      b.addEventListener('click', function () { fn(b); });
+      return b;
+    }
+    function sec(label) { var n = el('div', { class: 'ctx-sec' }, el('span', { class: 'ctx-lab', text: label })); menu.appendChild(n); return n; }
+    function pills(host, list, isOn, fn) {
+      var row = el('div', { class: 'ctx-pills' });
+      list.forEach(function (p) {
+        var b = el('button', { type: 'button', class: 'pill' + (isOn(p) ? ' on' : ''), text: p.label, title: p.title || null });
+        b.addEventListener('click', function () { fn(p); });
+        row.appendChild(b);
+      });
+      host.appendChild(row);
+    }
+    function change(fn) { var d = draftOf(id); if (!d) { closeCtx(); return; } fn(d); commitTask(d); build(); }
+    function build() {
+      var t = draftOf(id); if (!t) { closeCtx(); return; }
+      menu.textContent = '';
+      var st = stateOf(t);
+      menu.appendChild(item('Открыть', function () { closeCtx(); openTask(id); }));
+      menu.appendChild(item(st === 'wip' ? 'Снять «в процессе»' : 'В процессе', function () { setState(id, st === 'wip' ? 'todo' : 'wip'); build(); }, '', el('span', { class: 'st wip' })));
+      menu.appendChild(item(st === 'done' ? 'Вернуть в работу' : 'Выполнено', function () { setState(id, st === 'done' ? 'todo' : 'done'); build(); }, '', el('span', { class: 'st done' })));
+      menu.appendChild(el('hr'));
+      var ds = sec('Дата');
+      pills(ds, [
+        { label: 'Сегодня', v: presetDate('today') }, { label: 'Завтра', v: presetDate('tomorrow') },
+        { label: 'На неделе', v: presetDate('week') }, { label: '+7 дней', v: presetDate('next') }, { label: 'Без даты', v: null }
+      ].map(function (p) { p.title = p.v || 'убрать дату'; return p; }),
+        function (p) { return p.v === t.date; },
+        function (p) { change(function (d) { d.date = p.v; if (!p.v) { d.start = null; d.end = null; } }); });
+      sec('Цвета').appendChild(colorPicker(t.colors || [], function (v) { change(function (d) { if (v.length) d.colors = v; else delete d.colors; }); }));
+      var is = sec('Значки'); is.appendChild(iconPicker(t.icons || [], function (v) { change(function (d) { if (v.length) d.icons = v; else delete d.icons; }); }));
+      var ps = sec('Приоритет');
+      pills(ps, [1, 2, 3, 4].map(function (n) { return { label: 'P' + n, v: n }; }).concat([{ label: 'Нет', v: null }]),
+        function (p) { return (t.priority || null) === p.v; }, function (p) { change(function (d) { d.priority = p.v; }); });
+      var cl = sec('Колонка');
+      pills(cl, columns().map(function (c) { return { label: c.title, v: c.id }; }),
+        function (p) { return colOf(t).id === p.v; }, function (p) { change(function (d) { d.status = p.v; if (colById(p.v).done) delete d.wip; }); });
+      menu.appendChild(el('hr'));
+      menu.appendChild(item(t.pinned ? 'Открепить от разбора' : 'Не двигать при разборе', function () { change(function (d) { if (d.pinned) delete d.pinned; else d.pinned = true; }); }));
+      menu.appendChild(item('Дублировать', function () {
+        var c = clone(t); c.id = uid(); c.title += ' (копия)'; c.created = new Date().toISOString(); c.order = (t.order || 0) + 1;
+        delete c.carriedFrom; delete c.aiNote; delete c.pinned; closeCtx(); commitTask(c);
+      }));
+      menu.appendChild(item('Удалить', function (b) { arm(b, 'ctxdel', 'Точно удалить?', function () { closeCtx(); removeTask(id); }); }, 'danger'));
+    }
+    build();
+    document.body.appendChild(menu);
+    var w = menu.offsetWidth, h = menu.offsetHeight;
+    menu.style.left = Math.max(8, Math.min(e.clientX, innerWidth - w - 8)) + 'px';
+    menu.style.top = Math.max(8, Math.min(e.clientY, innerHeight - h - 8)) + 'px';
+    function down(ev) { if (!menu.contains(ev.target)) closeCtx(); }
+    function key(ev) { if (ev.key === 'Escape') { ev.stopPropagation(); closeCtx(); } }
+    window.addEventListener('pointerdown', down, true); window.addEventListener('keydown', key, true);
+    window.addEventListener('blur', closeCtx); window.addEventListener('resize', closeCtx);
+    ctxOff = function () {
+      window.removeEventListener('pointerdown', down, true); window.removeEventListener('keydown', key, true);
+      window.removeEventListener('blur', closeCtx); window.removeEventListener('resize', closeCtx);
+    };
+  }
   function dueBadge(t) {
     if (!t.date) return null;
     var cls = 'due';
@@ -1154,9 +1314,16 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var d = dueBadge(t); if (d) meta.appendChild(d);
     if (t.estimate && t.start == null) meta.appendChild(el('span', { class: 'est', text: '~' + t.estimate + ' мин' }));
     if (t.carriedFrom && t.carriedFrom.length) meta.appendChild(el('span', { class: 'carried', title: 'Перенесена: ' + t.carriedFrom.join(', '), text: '↻' + t.carriedFrom.length }));
-    var c = el('button', { class: 'card' + (isDone(t) ? ' done' : ''), data: { id: t.id } },
-      el('span', { class: 'card-title', text: t.title }), meta.childNodes.length ? meta : null);
+    (t.icons || []).slice().reverse().forEach(function (ic) { meta.insertBefore(el('span', { class: 'ic-badge', text: ic }), meta.firstChild); });
+    var lbls = null;
+    if (t.colors && t.colors.length) {
+      lbls = el('div', { class: 'lbls' });
+      t.colors.forEach(function (id) { var b = el('span', { class: 'lbl' }); b.style.setProperty('--c', colorHex(id)); lbls.appendChild(b); });
+    }
+    var c = el('button', { class: 'card' + (isDone(t) ? ' done' : ''), data: { id: t.id } }, lbls,
+      el('div', { class: 'card-head' }, stBtn(t), el('span', { class: 'card-title', text: t.title })), meta.childNodes.length ? meta : null);
     c.addEventListener('click', function () { openTask(t.id); });
+    c.addEventListener('contextmenu', function (e) { ctxMenu(e, t.id); });
     attachDrag(c, t.id);
     return c;
   }
@@ -1165,7 +1332,9 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   function chipNode(t) {
     var c = el('button', { class: 'chip' + (isDone(t) ? ' done' : '') + (t.kind === 'routine' ? ' routine' : ''), title: t.title, data: { a: t.area } },
       el('span', { class: 'dot' }), el('span', { class: 't', text: (t.start != null ? hhmm(t.start) + ' ' : '') + t.title }));
+    if (t.colors && t.colors.length) { c.classList.add('has-c'); c.style.setProperty('--c', colorHex(t.colors[0])); }
     c.addEventListener('click', function () { openTask(t.id); });
+    c.addEventListener('contextmenu', function (e) { ctxMenu(e, t.id); });
     attachDrag(c, t.id);
     return c;
   }
@@ -1304,6 +1473,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     node.style.width = 'calc(' + (100 / lanes) + '% - 6px)';
     node.addEventListener('pointerdown', function (e) { evDown(e, t, node, e.target === h1 ? 'top' : e.target === h2 ? 'bottom' : 'move', cols, keys); });
     node.addEventListener('keydown', function (e) { if (e.key === 'Enter') openTask(t.id); });
+    node.addEventListener('contextmenu', function (e) { ctxMenu(e, t.id); });
     return node;
   }
   function timeGrid(n) {
@@ -1404,12 +1574,15 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     });
     var est = el('input', { id: 'f-est', type: 'number', min: '5', step: '5', value: task.estimate || '', placeholder: 'мин' });
     var pin = el('input', { id: 'f-pin', type: 'checkbox' }); pin.checked = !!task.pinned;
+    var cols = (task.colors || []).slice(), icos = (task.icons || []).slice();
     var err = el('div', { class: 'err', hidden: true });
     function commit() {
       var v = title.value.trim();
       if (!v) { err.hidden = false; err.textContent = 'Введите название задачи.'; title.focus(); return; }
       task.title = v; task.desc = desc.value.trim() || null; task.status = status.value; task.date = date.value || null;
       task.area = area.value || null; task.priority = pr.value ? +pr.value : null;
+      if (cols.length) task.colors = cols; else delete task.colors;
+      if (icos.length) task.icons = icos; else delete task.icons;
       task.estimate = est.value ? Math.max(1, Math.round(+est.value)) : null;
       if (pin.checked) task.pinned = true; else delete task.pinned;
       var s = toMin(startI.value), en = toMin(endI.value);
@@ -1441,6 +1614,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       el('div', { class: 'row2' }, field('Приоритет', 'f-pr', pr), field('Оценка, мин', 'f-est', est)),
       el('div', { class: 'row2' }, field('Область', 'f-area', area),
         el('div', { class: 'field' }, el('span', { class: 'flabel', text: 'Для Claude' }), el('label', { class: 'check', for: 'f-pin' }, pin, 'Не двигать при разборе'))),
+      el('div', { class: 'field' }, el('span', { class: 'flabel', text: 'Цвета' }), colorPicker(cols, function (v) { cols = v; })),
+      el('div', { class: 'field' }, el('span', { class: 'flabel', text: 'Значки' }), iconPicker(icos, function (v) { icos = v; })),
       task.aiNote ? el('div', { class: 'ainote' }, el('b', { text: 'Комментарий Claude: ' }), task.aiNote) : null,
       task.carriedFrom && task.carriedFrom.length ? el('p', { class: 'hint', text: 'Переносилась с недель: ' + task.carriedFrom.join(', ') }) : null,
       el('p', { class: 'hint', text: 'Без даты задача лежит в Inbox. С датой и временем стоит в сетке дня.' }),
