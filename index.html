@@ -14,7 +14,7 @@
 <title>TOTALTASK</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Figtree:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Figtree:wght@400;500;600&family=Newsreader:ital,wght@0,400;1,400&display=swap">
 <style>
 /* Layout: sticky top bar; calendar pane left, kanban right, each filling the viewport height; on phones one pane at a time via tabs. */
 :root {
@@ -29,6 +29,7 @@
   --a-personal-bg: #D9F0EF; --a-personal-fg: #17635F;
   --font-display: "Bricolage Grotesque", "Trebuchet MS", sans-serif;
   --font-body: "Figtree", system-ui, "Segoe UI", sans-serif;
+  --font-note: "Newsreader", Georgia, "Times New Roman", serif;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -279,7 +280,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .ev .st:not(.wip):not(.done) { border-color: currentColor; }
 .ev .lbls { gap: 3px; margin-bottom: 2px; }
 .ev .lbl { width: 22px; height: 4px; }
-.ev-desc { margin: 1px 0 0 18px; font-size: 0.667em; line-height: 1.25; font-weight: 500; opacity: .85; overflow: hidden; overflow-wrap: anywhere;
+.ev-desc { margin: 1px 0 0 18px; font-family: var(--font-note); font-style: italic; font-size: 1em; line-height: 1.25; font-weight: 400; opacity: .9; overflow: hidden; overflow-wrap: anywhere;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 99; }
 .ev.short .ev-desc { display: none; }
 .ev-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 2px; }
