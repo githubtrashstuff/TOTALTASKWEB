@@ -135,7 +135,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .st.done { border-color: #30A46C; background: #30A46C; }
 .st.done::after { content: "✓"; }
 .ic-badge { font-size: 13px; line-height: 1; }
-.chip.has-c { border-left: 3px solid var(--c); }
+.card.has-cc, .chip.has-cc { background: color-mix(in srgb, var(--cc) 20%, var(--surface)); border-color: color-mix(in srgb, var(--cc) 50%, var(--line)); }
+.ev.has-cc { --abg: color-mix(in srgb, var(--cc) 26%, var(--surface)); --afg: color-mix(in srgb, var(--cc) 62%, var(--fg)); }
 .ctx { position: fixed; z-index: 60; width: 272px; max-height: calc(100dvh - 16px); overflow: auto; background: var(--surface); border: 1px solid var(--line);
   border-radius: 12px; padding: 6px; box-shadow: 0 12px 32px rgb(0 0 0 / .28); font-size: 13px; display: flex; flex-direction: column; gap: 2px; }
 .ctx-sec { padding: 6px 8px; display: flex; flex-direction: column; gap: 6px; }
@@ -800,7 +801,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (has('area')) ps.push('область ' + (areaName(t.area) || 'снята'));
     if (has('pinned')) ps.push(t.pinned ? 'закреплена' : 'откреплена');
     if (has('wip')) ps.push(t.wip ? 'в процессе' : 'не в процессе');
-    if (has('colors')) ps.push('цвета');
+    if (has('color')) ps.push('цвет карточки');
+    if (has('colors')) ps.push('метки');
     if (has('icons')) ps.push('значки');
     if (ps.length) out.push({ cls: 'параметры', text: T + ': ' + ps.join(', ') });
     if (!out.length && has('order')) out.push({ cls: 'порядок', id: t.id, text: T });
@@ -1109,14 +1111,18 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   var ICONS = ['⭐', '🔥', '⚡', '🚩', '💡', '🔔', '📌', '🔒', '❤️', '💬', '🛒', '💰', '📞', '🎯', '⚠️', '🎁', '📅', '✈️', '🏠', '💪', '📚', '🧹', '🍽️', '😴'];
   function colorHex(id) { for (var i = 0; i < COLORS.length; i++) if (COLORS[i].id === id) return COLORS[i].hex; return '#888'; }
   function toggled(arr, v) { var i = arr.indexOf(v), r = arr.slice(); if (i >= 0) r.splice(i, 1); else r.push(v); return r; }
-  function colorPicker(cur, onSet) {
+  function paintCard(node, t) {
+    if (!t.color) return;
+    node.classList.add('has-cc'); node.style.setProperty('--cc', colorHex(t.color));
+  }
+  function colorPicker(cur, onSet, single) {
     var box = el('div', { class: 'sw-row' });
     (function paint() {
       box.textContent = '';
       COLORS.forEach(function (c) {
         var on = cur.indexOf(c.id) >= 0, b = el('button', { type: 'button', class: 'sw' + (on ? ' on' : ''), title: c.name, 'aria-label': c.name, 'aria-pressed': String(on) });
         b.style.setProperty('--c', c.hex);
-        b.addEventListener('click', function () { cur = toggled(cur, c.id); onSet(cur); paint(); });
+        b.addEventListener('click', function () { cur = single ? (on ? [] : [c.id]) : toggled(cur, c.id); onSet(cur); paint(); });
         box.appendChild(b);
       });
     })();
@@ -1193,7 +1199,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       ].map(function (p) { p.title = p.v || 'убрать дату'; return p; }),
         function (p) { return p.v === t.date; },
         function (p) { change(function (d) { d.date = p.v; if (!p.v) { d.start = null; d.end = null; } }); });
-      sec('Цвета').appendChild(colorPicker(t.colors || [], function (v) { change(function (d) { if (v.length) d.colors = v; else delete d.colors; }); }));
+      sec('Цвет карточки').appendChild(colorPicker(t.color ? [t.color] : [], function (v) { change(function (d) { if (v[0]) d.color = v[0]; else delete d.color; }); }, true));
+      sec('Метки').appendChild(colorPicker(t.colors || [], function (v) { change(function (d) { if (v.length) d.colors = v; else delete d.colors; }); }));
       var is = sec('Значки'); is.appendChild(iconPicker(t.icons || [], function (v) { change(function (d) { if (v.length) d.icons = v; else delete d.icons; }); }));
       var ps = sec('Приоритет');
       pills(ps, [1, 2, 3, 4].map(function (n) { return { label: 'P' + n, v: n }; }).concat([{ label: 'Нет', v: null }]),
@@ -1328,6 +1335,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       el('div', { class: 'card-head' }, stBtn(t), el('span', { class: 'card-title', text: t.title })), meta.childNodes.length ? meta : null);
     c.addEventListener('click', function () { openTask(t.id); });
     c.addEventListener('contextmenu', function (e) { ctxMenu(e, t.id); });
+    paintCard(c, t);
     attachDrag(c, t.id);
     return c;
   }
@@ -1336,7 +1344,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   function chipNode(t) {
     var c = el('button', { class: 'chip' + (isDone(t) ? ' done' : '') + (t.kind === 'routine' ? ' routine' : ''), title: t.title, data: { a: t.area } },
       el('span', { class: 'dot' }), el('span', { class: 't', text: (t.start != null ? hhmm(t.start) + ' ' : '') + t.title }));
-    if (t.colors && t.colors.length) { c.classList.add('has-c'); c.style.setProperty('--c', colorHex(t.colors[0])); }
+    paintCard(c, t);
     c.addEventListener('click', function () { openTask(t.id); });
     c.addEventListener('contextmenu', function (e) { ctxMenu(e, t.id); });
     attachDrag(c, t.id);
@@ -1478,6 +1486,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     node.addEventListener('pointerdown', function (e) { evDown(e, t, node, e.target === h1 ? 'top' : e.target === h2 ? 'bottom' : 'move', cols, keys); });
     node.addEventListener('keydown', function (e) { if (e.key === 'Enter') openTask(t.id); });
     node.addEventListener('contextmenu', function (e) { ctxMenu(e, t.id); });
+    paintCard(node, t);
     return node;
   }
   function inlineCreate(ghost, key, a, b) {
@@ -1603,7 +1612,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     });
     var est = el('input', { id: 'f-est', type: 'number', min: '5', step: '5', value: task.estimate || '', placeholder: 'мин' });
     var pin = el('input', { id: 'f-pin', type: 'checkbox' }); pin.checked = !!task.pinned;
-    var cols = (task.colors || []).slice(), icos = (task.icons || []).slice();
+    var cols = (task.colors || []).slice(), icos = (task.icons || []).slice(), cc = task.color || null;
     var err = el('div', { class: 'err', hidden: true });
     function commit() {
       var v = title.value.trim();
@@ -1611,6 +1620,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       task.title = v; task.desc = desc.value.trim() || null; task.status = status.value; task.date = date.value || null;
       task.area = area.value || null; task.priority = pr.value ? +pr.value : null;
       if (cols.length) task.colors = cols; else delete task.colors;
+      if (cc) task.color = cc; else delete task.color;
       if (icos.length) task.icons = icos; else delete task.icons;
       task.estimate = est.value ? Math.max(1, Math.round(+est.value)) : null;
       if (pin.checked) task.pinned = true; else delete task.pinned;
@@ -1643,7 +1653,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       el('div', { class: 'row2' }, field('Приоритет', 'f-pr', pr), field('Оценка, мин', 'f-est', est)),
       el('div', { class: 'row2' }, field('Область', 'f-area', area),
         el('div', { class: 'field' }, el('span', { class: 'flabel', text: 'Для Claude' }), el('label', { class: 'check', for: 'f-pin' }, pin, 'Не двигать при разборе'))),
-      el('div', { class: 'field' }, el('span', { class: 'flabel', text: 'Цвета' }), colorPicker(cols, function (v) { cols = v; })),
+      el('div', { class: 'field' }, el('span', { class: 'flabel', text: 'Цвет карточки' }), colorPicker(cc ? [cc] : [], function (v) { cc = v[0] || null; }, true)),
+      el('div', { class: 'field' }, el('span', { class: 'flabel', text: 'Метки' }), colorPicker(cols, function (v) { cols = v; })),
       el('div', { class: 'field' }, el('span', { class: 'flabel', text: 'Значки' }), iconPicker(icos, function (v) { icos = v; })),
       task.aiNote ? el('div', { class: 'ainote' }, el('b', { text: 'Комментарий Claude: ' }), task.aiNote) : null,
       task.carriedFrom && task.carriedFrom.length ? el('p', { class: 'hint', text: 'Переносилась с недель: ' + task.carriedFrom.join(', ') }) : null,
