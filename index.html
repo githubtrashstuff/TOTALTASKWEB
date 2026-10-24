@@ -279,6 +279,9 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .ev .st:not(.wip):not(.done) { border-color: currentColor; }
 .ev .lbls { gap: 3px; margin-bottom: 2px; }
 .ev .lbl { width: 22px; height: 4px; }
+.ev-desc { margin: 1px 0 0 18px; font-size: 0.667em; line-height: 1.25; font-weight: 500; opacity: .85; overflow: hidden; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 99; }
+.ev.short .ev-desc { display: none; }
 .ev-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 2px; }
 .ev-meta .lb { font-size: 10px; padding: 0 6px; }
 .ev-meta .est, .ev-meta .carried { font-size: 11px; }
@@ -921,6 +924,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var b = root.querySelector('.board'); if (b) b.scrollLeft = keepLeft;
     var sc = root.querySelector('.tg');
     if (sc) { sc.scrollTop = gridScroll; sc.addEventListener('scroll', function () { gridScroll = sc.scrollTop; }); }
+    root.querySelectorAll('.ev').forEach(fitDesc);
     $('mt-cal').setAttribute('aria-pressed', String(mtab === 'cal'));
     $('mt-board').setAttribute('aria-pressed', String(mtab === 'board'));
     setSync();
@@ -1534,6 +1538,15 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     node.classList.toggle('short', (e - s) * PPM < 36);
     node.classList.toggle('tiny', (e - s) * PPM < 64);
     var tm = node.querySelector('.ev-time'); if (tm) tm.textContent = hhmm(s) + '–' + hhmm(e);
+    if (node.isConnected) fitDesc(node);
+  }
+  function fitDesc(node) {
+    var d = node.querySelector('.ev-desc'); if (!d || node.classList.contains('short')) return;
+    d.style.webkitLineClamp = '99'; d.style.display = '';
+    var meta = node.querySelector('.ev-meta'), mh = meta && meta.offsetHeight ? meta.offsetHeight + 2 : 0;
+    var lh = parseFloat(getComputedStyle(d).lineHeight) || 10, avail = node.clientHeight - d.offsetTop - mh - 2;
+    var n = Math.floor(avail / lh);
+    if (n < 1) d.style.display = 'none'; else d.style.webkitLineClamp = String(n);
   }
   var BIG_MIN = 180;
   function laneLayout(items) {
@@ -1614,6 +1627,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var row = el('span', { class: 'ev-row' }, stBtn(t), el('span', { class: 'ev-title', text: (t.priority ? 'P' + t.priority + ' · ' : '') + t.title }));
     (t.icons || []).forEach(function (ic) { row.appendChild(el('span', { class: 'ic-badge', text: ic })); });
     node.appendChild(row);
+    if (t.desc) node.appendChild(el('div', { class: 'ev-desc', text: t.desc }));
     var meta = el('div', { class: 'ev-meta' });
     if (t.area) meta.appendChild(el('span', { class: 'lb', data: { a: t.area }, text: areaName(t.area) }));
     if (t.estimate) meta.appendChild(el('span', { class: 'est', text: '~' + t.estimate + ' мин' }));
@@ -1709,7 +1723,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     keys.forEach(function (key, ci) {
       var col = cols[ci];
       lanesFor(items.filter(function (t) { return t.date === key && t.start != null; }))
-        .forEach(function (r) { col.appendChild(evNode(r.t, r.lane, r.lanes, cols, keys, r.off, r.span, r.big)); });
+        .forEach(function (r) { var n = evNode(r.t, r.lane, r.lanes, cols, keys, r.off, r.span, r.big); col.appendChild(n); });
       if (key === todayISO) col.appendChild(el('div', { class: 'now', style: 'top:' + (nowMin() * PPM) + 'px' }));
       setDrop(col, function (id, s) {
         var d = draftOf(id); if (!d) return;
