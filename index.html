@@ -107,7 +107,6 @@ main { padding-top: 14px; }
 .icon-btn.armed { background: var(--warn); color: var(--surface); padding: 0 8px; font-size: 12px; }
 .cards { display: flex; flex-direction: column; gap: 8px; min-height: 40px; border-radius: 8px; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; cursor: grab; text-align: left; width: 100%; }
-.card:hover { border-color: var(--muted); }
 .card, .chip { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .card.drag-src { display: none; }
 .chip.drag-src { opacity: .35; }
@@ -147,6 +146,16 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .card.has-cc .card-title { color: var(--ct); }
 .card.has-cc .meta > span:not(.lb):not(.over) { color: var(--ct); opacity: .85; }
 .has-cc .st:not(.wip):not(.done) { border-color: var(--ct); }
+.card, .chip, .ev { outline: 4px solid transparent; outline-offset: 0; transition: outline-color var(--hover-ms, 200ms) ease; }
+.card:hover, .chip:hover, .ev:hover { outline-color: var(--ring, var(--accent)); }
+.ev:hover { z-index: 4; }
+.card[data-a], .ev[data-a] { --ring: var(--afg); }
+.card.has-cc, .chip.has-cc, .ev.has-cc { --ring: color-mix(in srgb, var(--cc) 70%, var(--fg)); }
+.card.has-cc, .chip.has-cc, .ev.has-cc {
+  background-image: linear-gradient(165deg, rgb(255 255 255 / .24), rgb(255 255 255 / 0) 45%, rgb(0 0 0 / .17));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .38), inset 0 -2px 5px rgb(0 0 0 / .2), 0 3px 8px rgb(0 0 0 / .22), 0 1px 2px rgb(0 0 0 / .2);
+}
+.ev.has-cc.dragging-ev { box-shadow: inset 0 1px 0 rgb(255 255 255 / .38), inset 0 -2px 5px rgb(0 0 0 / .2), 0 10px 22px rgb(0 0 0 / .35); }
 .ev.has-cc { --abg: var(--fill, color-mix(in srgb, var(--cc) 80%, var(--surface))); --afg: var(--ct); border-left-color: color-mix(in srgb, var(--cc), #000 25%); }
 .ctx { position: fixed; z-index: 60; width: 272px; max-height: calc(100dvh - 16px); overflow: auto; background: var(--surface); border: 1px solid var(--line);
   border-radius: 12px; padding: 6px; box-shadow: 0 12px 32px rgb(0 0 0 / .28); font-size: 13px; display: flex; flex-direction: column; gap: 2px; }
@@ -222,7 +231,6 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .day:hover .add-day, .tg-ad:hover .add-day, .add-day:focus-visible { opacity: 1; }
 @media (hover: none) { .add-day { opacity: .6; } }
 .chip { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 3px 6px; font-size: 12px; cursor: grab; min-width: 0; }
-.chip:hover { border-color: var(--muted); }
 .chip .dot { flex: 0 0 8px; height: 8px; border-radius: 50%; background: var(--afg, var(--muted)); }
 .chip .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip.done .t { text-decoration: line-through; color: var(--muted); }
@@ -530,9 +538,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   /* ---------- состояние ---------- */
   var cfg = lsGet(CFG_KEY);
   var ui = lsGet(UI_KEY) || {};
-  var DEFAULT_SETTINGS = { layout: 'left', slide: 600, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
+  var DEFAULT_SETTINGS = { layout: 'left', slide: 600, hover: 200, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
     device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'телефон' : 'компьютер' };
   var settings = Object.assign({}, DEFAULT_SETTINGS, ui.settings || {});
+  document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms');
   var backend = null, demo = false;
   var files = {};
   var actions = [];            // несохранённые действия: { at, lines: [...], ops: [...] }
@@ -1822,10 +1831,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     ]);
     if (f.state === 'ready' && !demo) loadFile(P_REPORT).then(function () { var r = document.querySelector('.report'); if (r) r.textContent = files[P_REPORT].data || 'Отчёта пока нет.'; });
   }
-  function slideCtl() {
-    var r = el('input', { id: 's-slide', type: 'range', min: '0', max: '2000', step: '100', value: String(settings.slide) });
-    var out = el('span', { class: 'hint', text: (settings.slide / 1000).toFixed(1) + ' с' });
-    r.addEventListener('input', function () { settings.slide = +r.value; out.textContent = (settings.slide / 1000).toFixed(1) + ' с'; saveSettings(); });
+  function msCtl(id, key, max, step, after) {
+    var r = el('input', { id: id, type: 'range', min: '0', max: String(max), step: String(step), value: String(settings[key]) });
+    var out = el('span', { class: 'hint', text: (settings[key] / 1000).toFixed(2).replace(/0$/, '') + ' с' });
+    r.addEventListener('input', function () { settings[key] = +r.value; out.textContent = (settings[key] / 1000).toFixed(2).replace(/0$/, '') + ' с'; saveSettings(); if (after) after(); });
     return el('div', { style: 'display:flex;align-items:center;gap:8px' }, r, out);
   }
   function settingsModal() {
@@ -1862,8 +1871,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
         : 'Всё сохранено.' + (lastSubject ? ' Последний коммит: ' + lastSubject : '') }),
       row('Календарь', 's-layout', sel('s-layout', settings.layout, [['left', 'Слева, канбан справа'], ['right', 'Справа, канбан слева']],
         function (v) { settings.layout = v; $('view').dataset.layout = v; }), 'Расположение двух частей на широком экране.'),
-      row('Скольжение между днями', 's-slide', slideCtl(),
+      row('Скольжение между днями', 's-slide', msCtl('s-slide', 'slide', 2000, 100),
         'Как долго карточка плывёт в соседний день, когда вы тянете её в календаре. 0 — мгновенно.'),
+      row('Контур при наведении', 's-hover', msCtl('s-hover', 'hover', 1000, 50, function () { document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms'); }),
+        'Как быстро появляется и гаснет рамка вокруг карточки под курсором. 0 — мгновенно.'),
       row('Сохранять после паузы', 's-idle', sel('s-idle', settings.idle,
         [[15, '15 секунд'], [30, '30 секунд'], [60, '1 минута'], [120, '2 минуты'], [300, '5 минут'], [600, '10 минут'], [0, 'Не сохранять по паузе']],
         function (v) { settings.idle = +v; scheduleFlush(); }),
