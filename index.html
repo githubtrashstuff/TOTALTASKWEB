@@ -135,8 +135,12 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .st.done { border-color: #30A46C; background: #30A46C; }
 .st.done::after { content: "✓"; }
 .ic-badge { font-size: 13px; line-height: 1; }
-.card.has-cc, .chip.has-cc { background: color-mix(in srgb, var(--cc) 20%, var(--surface)); border-color: color-mix(in srgb, var(--cc) 50%, var(--line)); }
-.ev.has-cc { --abg: color-mix(in srgb, var(--cc) 26%, var(--surface)); --afg: color-mix(in srgb, var(--cc) 62%, var(--fg)); }
+.card[data-a] { background: var(--abg); border-left: 3px solid var(--afg); padding-left: 10px; }
+.card[data-a] .card-title { color: var(--afg); }
+.card[data-a].done .card-title { color: var(--muted); }
+.card.has-cc, .chip.has-cc { background: color-mix(in srgb, var(--cc) 40%, var(--surface)); border-color: color-mix(in srgb, var(--cc) 70%, var(--line)); border-left: 3px solid var(--cc); }
+.card.has-cc { padding-left: 10px; }
+.ev.has-cc { --abg: color-mix(in srgb, var(--cc) 40%, var(--surface)); --afg: var(--fg); border-left-color: var(--cc); }
 .ctx { position: fixed; z-index: 60; width: 272px; max-height: calc(100dvh - 16px); overflow: auto; background: var(--surface); border: 1px solid var(--line);
   border-radius: 12px; padding: 6px; box-shadow: 0 12px 32px rgb(0 0 0 / .28); font-size: 13px; display: flex; flex-direction: column; gap: 2px; }
 .ctx-sec { padding: 6px 8px; display: flex; flex-direction: column; gap: 6px; }
@@ -496,7 +500,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   /* ---------- состояние ---------- */
   var cfg = lsGet(CFG_KEY);
   var ui = lsGet(UI_KEY) || {};
-  var DEFAULT_SETTINGS = { idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
+  var DEFAULT_SETTINGS = { slide: 600, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
     device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'телефон' : 'компьютер' };
   var settings = Object.assign({}, DEFAULT_SETTINGS, ui.settings || {});
   var backend = null, demo = false;
@@ -1331,7 +1335,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       lbls = el('div', { class: 'lbls' });
       t.colors.forEach(function (id) { var b = el('span', { class: 'lbl' }); b.style.setProperty('--c', colorHex(id)); lbls.appendChild(b); });
     }
-    var c = el('button', { class: 'card' + (isDone(t) ? ' done' : ''), data: { id: t.id } }, lbls,
+    var c = el('button', { class: 'card' + (isDone(t) ? ' done' : ''), data: { id: t.id, a: t.color ? null : t.area } }, lbls,
       el('div', { class: 'card-head' }, stBtn(t), el('span', { class: 'card-title', text: t.title })), meta.childNodes.length ? meta : null);
     c.addEventListener('click', function () { openTask(t.id); });
     c.addEventListener('contextmenu', function (e) { ctxMenu(e, t.id); });
@@ -1457,7 +1461,15 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       var colEl = cols[ci], m = minAt(colEl, ev.clientY), s = cur.s, en = cur.e;
       if (mode === 'move') {
         s = clamp(snap(m - grab, ev.ctrlKey), 0, 1440 - dur); en = s + dur;
-        if (ci !== cur.i) { colEl.appendChild(node); cur.i = ci; node.style.left = '1px'; node.style.width = 'calc(100% - 6px)'; }
+        if (ci !== cur.i) {
+          var first = node.getBoundingClientRect();
+          node.getAnimations().forEach(function (a) { a.cancel(); });
+          colEl.appendChild(node); cur.i = ci; node.style.left = '1px'; node.style.width = 'calc(100% - 6px)';
+          paintEv(node, s, en);
+          var last = node.getBoundingClientRect();
+          if (settings.slide > 0) node.animate([{ transform: 'translate(' + (first.left - last.left) + 'px,' + (first.top - last.top) + 'px)' }, { transform: 'none' }],
+            { duration: settings.slide, easing: 'cubic-bezier(.22,.8,.2,1)' });
+        }
       } else if (mode === 'top') { s = clamp(snap(m, ev.ctrlKey), 0, e0 - 1); en = e0; }
       else { s = s0; en = clamp(snap(m, ev.ctrlKey), s0 + 1, 1440); }
       cur.s = s; cur.e = en; paintEv(node, s, en);
@@ -1683,6 +1695,12 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     ]);
     if (f.state === 'ready' && !demo) loadFile(P_REPORT).then(function () { var r = document.querySelector('.report'); if (r) r.textContent = files[P_REPORT].data || 'Отчёта пока нет.'; });
   }
+  function slideCtl() {
+    var r = el('input', { id: 's-slide', type: 'range', min: '0', max: '2000', step: '100', value: String(settings.slide) });
+    var out = el('span', { class: 'hint', text: (settings.slide / 1000).toFixed(1) + ' с' });
+    r.addEventListener('input', function () { settings.slide = +r.value; out.textContent = (settings.slide / 1000).toFixed(1) + ' с'; saveSettings(); });
+    return el('div', { style: 'display:flex;align-items:center;gap:8px' }, r, out);
+  }
   function settingsModal() {
     function sel(id, value, opts, onChange) {
       var x = el('select', { id: id });
@@ -1715,6 +1733,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       el('h2', { text: 'Настройки' }), el('p', { class: 'hint', text: info }),
       el('p', { class: 'hint', text: n ? 'Не сохранено: ' + plural(n, 'действие', 'действия', 'действий') + '. Они хранятся в этом браузере и не пропадут при закрытии вкладки.'
         : 'Всё сохранено.' + (lastSubject ? ' Последний коммит: ' + lastSubject : '') }),
+      row('Скольжение между днями', 's-slide', slideCtl(),
+        'Как долго карточка плывёт в соседний день, когда вы тянете её в календаре. 0 — мгновенно.'),
       row('Сохранять после паузы', 's-idle', sel('s-idle', settings.idle,
         [[15, '15 секунд'], [30, '30 секунд'], [60, '1 минута'], [120, '2 минуты'], [300, '5 минут'], [600, '10 минут'], [0, 'Не сохранять по паузе']],
         function (v) { settings.idle = +v; scheduleFlush(); }),
