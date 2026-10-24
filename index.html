@@ -251,6 +251,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .ev-h { position: absolute; left: 0; right: 0; height: 6px; cursor: ns-resize; }
 .ev-h.h-t { top: 0; } .ev-h.h-b { bottom: 0; }
 .ev.dragging-ev { z-index: 5; box-shadow: 0 6px 16px rgb(0 0 0 / .28); cursor: grabbing; opacity: 1; }
+.ev.ghost.editing { pointer-events: auto; box-shadow: 0 0 0 2px var(--accent); cursor: text; z-index: 6; }
+.ev-input { display: block; width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: inherit; font: inherit; font-weight: 600; padding: 0; caret-color: var(--accent); }
+.ev-input::placeholder { color: inherit; opacity: .55; font-weight: 500; }
+.ev.short .ev-input { order: -1; flex: 1; }
 .ev.ghost { pointer-events: none; background: var(--accent-soft); color: var(--accent); border-left-color: var(--accent); }
 .ev.pv { z-index: 4; opacity: 0; background: color-mix(in srgb, var(--accent) 16%, var(--surface)); box-shadow: 0 0 0 1px var(--accent), 0 6px 16px rgb(0 0 0 / .18); transition: opacity .14s; }
 .ev.pv.in { opacity: 1; transition: opacity .14s, top .1s ease-out, height .1s ease-out; }
@@ -1476,6 +1480,24 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     node.addEventListener('contextmenu', function (e) { ctxMenu(e, t.id); });
     return node;
   }
+  function inlineCreate(ghost, key, a, b) {
+    var inp = el('input', { class: 'ev-input', placeholder: 'Название', 'aria-label': 'Название задачи', maxlength: '200' });
+    ghost.classList.add('editing'); ghost.appendChild(inp);
+    var done = false;
+    function finish(commit) {
+      if (done) return; done = true;
+      var v = inp.value.trim();
+      ghost.remove(); interacting = false;
+      if (commit && v) commitTask(newDraft({ title: v, date: key, start: a, end: b }));
+      else if (needRender) render();
+    }
+    inp.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
+    });
+    inp.addEventListener('blur', function () { finish(true); });
+    setTimeout(function () { inp.focus(); }, 0);
+  }
   function timeGrid(n) {
     var days = [], keys = [];
     for (var i = 0; i < n; i++) { var d = addDays(calDate, i); days.push(d); keys.push(iso(d)); }
@@ -1521,7 +1543,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
         interacting = true;
         var startM = clamp(snap(minAt(col, e.clientY), e.ctrlKey), 0, 1439);
         var y0 = e.clientY, moved = false, ghost = null, a = startM, b = startM + 1;
-        function stop() { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); if (ghost) ghost.remove(); }
+        function stop() { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); }
         function onMove(ev) {
           if (!moved) {
             if (Math.abs(ev.clientY - y0) < 6) return;
@@ -1533,7 +1555,14 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
           a = Math.min(startM, m); b = Math.max(startM, m); if (b - a < 1) b = a + 1;
           paintEv(ghost, a, b);
         }
-        function onUp() { stop(); interacting = false; if (moved) openNew({ date: key, start: a, end: b }); else endInteraction(); }
+        function onUp() {
+          stop();
+          if (!moved) { interacting = false; endInteraction(); return; }
+          if (b - a < 15) b = Math.min(1440, a + 15);
+          if (b - a < 15) a = b - 15;
+          paintEv(ghost, a, b);
+          inlineCreate(ghost, key, a, b);
+        }
         window.addEventListener('pointermove', onMove);
         window.addEventListener('pointerup', onUp);
       });
