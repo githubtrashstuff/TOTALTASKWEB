@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -72,7 +72,6 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .sync[data-s="busy"]::before { background: var(--amber); }
 .sync[data-s="error"] { color: var(--warn); }
 .sync[data-s="error"]::before { background: var(--warn); }
-.sync[data-s="demo"]::before { background: var(--muted); }
 .setting { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
 .setting .hint { grid-column: 1 / -1; }
 .setting select, .setting input[type=text] { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); max-width: 190px; }
@@ -306,6 +305,17 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 
 /* connect + modal */
 .connect { max-width: 520px; margin: 32px auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+.connect { max-width: 560px; }
+.connect-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.connect-top select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); flex: none; }
+.choice { border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.choice.primary { border-color: var(--accent); background: var(--accent-soft); }
+.choice h2 { margin: 0; font-family: var(--font-display); font-size: 17px; }
+.choice-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--surface); color: var(--muted); border: 1px solid var(--line); }
+.choice.primary .badge { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.gh-form { display: flex; flex-direction: column; gap: 10px; }
+.gh-form[hidden] { display: none; }
 .connect h1 { font-family: var(--font-display); font-size: 24px; margin: 0; text-wrap: balance; }
 .connect p { margin: 0; color: var(--muted); }
 .err { color: var(--warn); font-size: 13px; }
@@ -346,15 +356,15 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 <header class="top" id="top">
   <div class="brand"><i></i>TOTALTASK</div>
   <div class="tabs mtabs" id="mtabs">
-    <button class="tab" id="mt-cal" aria-pressed="true">Календарь</button>
-    <button class="tab" id="mt-board" aria-pressed="false">Доска</button>
+    <button class="tab" id="mt-cal" aria-pressed="true">Calendar</button>
+    <button class="tab" id="mt-board" aria-pressed="false">Board</button>
   </div>
   <div class="spacer"></div>
   <button class="sync" id="sync" type="button" hidden></button>
-  <input class="search" id="search" type="search" placeholder="Поиск по задачам" aria-label="Поиск по задачам" hidden>
-  <button class="btn" id="btn-claude" hidden>АНАЛИЗ</button>
-  <button class="btn primary" id="new-task" hidden>+ Задача</button>
-  <button class="btn" id="btn-settings" aria-label="Настройки" title="Настройки" hidden>⚙</button>
+  <input class="search" id="search" type="search" placeholder="Search tasks" aria-label="Search tasks" hidden>
+  <button class="btn" id="btn-claude" hidden>ANALYZE</button>
+  <button class="btn primary" id="new-task" hidden>+ Task</button>
+  <button class="btn" id="btn-settings" aria-label="Settings" title="Settings" hidden>⚙</button>
 </header>
 <main id="view"></main>
 <div id="modal-root"></div>
@@ -366,16 +376,659 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     { id: 'work', name: 'Работа' }, { id: 'home', name: 'Дом' }, { id: 'finance', name: 'Финансы' }, { id: 'health', name: 'Здоровье' },
     { id: 'food', name: 'Еда' }, { id: 'sleep', name: 'Сон' }, { id: 'personal', name: 'Личное' }
   ];
-  var CFG_KEY = 'tt-gh-v1', UI_KEY = 'tt-ui-v1';
-  var DEFAULT_BOARD = { columns: [{ id: 'backlog', title: 'Бэклог' }, { id: 'doing', title: 'В работе' }, { id: 'waiting', title: 'Ждёт' }, { id: 'done', title: 'Готово', done: true }] };
+  var CFG_KEY = 'tt-gh-v1', UI_KEY = 'tt-ui-v1', LOCAL_KEY = 'tt-local-v1';
+  function defaultBoard() { return { columns: [{ id: 'backlog', title: tr('Бэклог') }, { id: 'doing', title: tr('В работе') }, { id: 'waiting', title: tr('Ждёт') }, { id: 'done', title: tr('Готово'), done: true }] }; }
   var P_BOARD = 'data/board.json', P_INBOX = 'data/inbox.json', P_REPORT = 'data/reports/latest.md';
-  var DOW = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
   var PPM = 1;
-  var fmtShort = new Intl.DateTimeFormat('ru', { day: 'numeric', month: 'short' });
-  var fmtMonth = new Intl.DateTimeFormat('ru', { month: 'long', year: 'numeric' });
-  var fmtDay = new Intl.DateTimeFormat('ru', { weekday: 'long', day: 'numeric', month: 'long' });
-  var fmtDow = new Intl.DateTimeFormat('ru', { weekday: 'short' });
-  var fmtTime = new Intl.DateTimeFormat('ru', { hour: '2-digit', minute: '2-digit' });
+  /* ---------- язык ---------- */
+  var I18N = {
+   "en": {
+    "Бэклог": "Backlog",
+    "В работе": "In progress",
+    "Ждёт": "Waiting",
+    "Готово": "Done",
+    "Календарь": "Calendar",
+    "Доска": "Board",
+    "АНАЛИЗ": "ANALYZE",
+    "+ Задача": "+ Task",
+    "Поиск по задачам": "Search tasks",
+    "Настройки": "Settings",
+    "Нет связи с GitHub": "Can't reach GitHub",
+    "Ветка изменилась": "The branch has changed",
+    "Не удалось сохранить: в браузере нет места": "Couldn't save: the browser is out of storage",
+    ": файл повреждён": ": file is corrupted",
+    "не сохранено {what}": "{what} unsaved",
+    "{n} действие|{n} действия|{n} действий": "{n} action|{n} actions",
+    "Сохранено на этом устройстве": "Saved on this device",
+    "Нет доступа: проверьте токен": "No access: check your token",
+    "Сохраняю…": "Saving…",
+    "Офлайн": "Offline",
+    "Ошибка сохранения, ": "Save failed, ",
+    "Загружаю…": "Loading…",
+    "Сохранено": "Saved",
+    "Нажмите, чтобы сохранить сейчас": "Click to save now",
+    "Последний коммит: {s}": "Last commit: {s}",
+    "Всё сохранено": "Everything is saved",
+    "Канбан": "Kanban",
+    " (нажмите, чтобы сменить)": " (click to change)",
+    "Открыть": "Open",
+    "Убрать из календаря (останется в канбане)": "Remove from calendar (stays on the board)",
+    "Убрать из календаря": "Remove from calendar",
+    "Снять «в процессе»": "Clear “in progress”",
+    "В процессе": "In progress",
+    "Вернуть в работу": "Reopen",
+    "Выполнено": "Done",
+    "Дата": "Date",
+    "Сегодня": "Today",
+    "Завтра": "Tomorrow",
+    "На неделе": "This week",
+    "Без даты": "No date",
+    "убрать дату с карточки": "remove the date from the card",
+    "Цвет карточки": "Card color",
+    "Метки": "Labels",
+    "Значки": "Icons",
+    "Приоритет": "Priority",
+    "Нет": "None",
+    "Колонка": "Column",
+    "Открепить от разбора": "Allow planning to move it",
+    "Не двигать при разборе": "Don't move during planning",
+    "Дублировать": "Duplicate",
+    " (копия)": " (copy)",
+    "Удалить": "Delete",
+    "Точно удалить?": "Really delete?",
+    "Срок": "Due",
+    "Стоит в календаре": "Scheduled in the calendar",
+    "Inbox и недели {a}–{b}": "Inbox and weeks {a}–{b}",
+    "Inbox и неделя {a}": "Inbox and week {a}",
+    "Показывать распорядок": "Show routines",
+    "Название колонки": "Column name",
+    "Удалить колонку": "Delete column",
+    "Удалить?": "Delete?",
+    "+ Добавить карточку": "+ Add card",
+    "Название задачи": "Task name",
+    "+ Колонка": "+ Column",
+    " мин": " min",
+    "Перенесена: ": "Carried over from: ",
+    "Назад": "Back",
+    "Вперёд": "Forward",
+    "Месяц": "Month",
+    "3 дня": "3 days",
+    "День": "Day",
+    "Inbox, без даты": "Inbox, no date",
+    "Пусто. Новые задачи без даты попадают сюда, Claude распределяет их при разборе.": "Empty. New tasks without a date land here; Claude sorts them during planning.",
+    "Добавить задачу": "Add task",
+    "Добавить задачу на ": "Add task on ",
+    "ещё {n}": "{n} more",
+    "Распорядок скрыт в месяце. Включите «Показывать распорядок» над доской.": "Routines are hidden in the month view. Turn on “Show routines” above the board.",
+    "Название": "Title",
+    "весь день": "all day",
+    "Задача на весь день": "All-day task",
+    "Что нужно сделать": "What needs to be done",
+    "Описание: чем подробнее, тем точнее Claude оценит срок": "Description: the more detail, the better Claude can estimate the time",
+    "Без области": "No area",
+    "Не задан": "Not set",
+    "P1 срочно и важно": "P1 urgent and important",
+    "P2 важно": "P2 important",
+    "P3 обычное": "P3 normal",
+    "P4 когда-нибудь": "P4 someday",
+    "мин": "min",
+    "Введите название задачи.": "Enter a task name.",
+    "Конец должен быть позже начала.": "The end must be after the start.",
+    "Создать": "Create",
+    "Сохранить": "Save",
+    "Отмена": "Cancel",
+    "Новая задача": "New task",
+    "Задача": "Task",
+    "Распорядок": "Routine",
+    "Описание": "Description",
+    "Начало": "Start",
+    "Конец": "End",
+    "Оценка, мин": "Estimate, min",
+    "Область": "Area",
+    "Для Claude": "For Claude",
+    "Срок на карточке (только надпись)": "Due date on the card (label only)",
+    "Срок до (для диапазона)": "Due until (for a range)",
+    "Комментарий Claude: ": "Claude's note: ",
+    "Переносилась с недель: ": "Carried over from weeks: ",
+    "Без даты задача лежит в Inbox. С датой и временем стоит в сетке дня.": "Without a date the task sits in the Inbox. With a date and time it appears in the day grid.",
+    "Скопировать команду": "Copy command",
+    "Скопировано": "Copied",
+    "Нажмите Ctrl+C": "Press Ctrl+C",
+    "Анализ": "Analysis",
+    "Анализ задач": "Task analysis",
+    "Claude перенесёт невыполненное, разберёт Inbox, расставит приоритеты, сроки и время. 1. Скопируйте команду. 2. Откройте Claude Code и отправьте её. 3. Когда Claude закончит, обновления появятся здесь в течение минуты.": "Claude carries over what's unfinished, sorts the Inbox and sets priorities, deadlines and times. 1. Copy the command. 2. Open Claude Code and send it. 3. When Claude is done, the updates show up here within a minute.",
+    "Открыть Claude Code ↗": "Open Claude Code ↗",
+    "Отчёт последнего разбора": "Report of the last analysis",
+    "Отчёта пока нет.": "No report yet.",
+    "Закрыть": "Close",
+    " с": " s",
+    "Данные хранятся только в этом браузере, без аккаунта и без сети.": "Your data is stored only in this browser: no account, no network.",
+    "Подключено: {repo}, ветка {branch}.": "Connected: {repo}, branch {branch}.",
+    "Сохранить сейчас": "Save now",
+    "Сменить способ хранения": "Change storage mode",
+    "Отключить это устройство": "Disconnect this device",
+    "Вернуться к выбору? Данные останутся в этом браузере.": "Go back to the choice? Your data stays in this browser.",
+    "Токен и несохранённое удалятся. Точно?": "The token and unsaved changes will be deleted. Sure?",
+    "Скачать резервную копию": "Download backup",
+    "Не сохранено: {what}. Они хранятся в этом браузере и не пропадут при закрытии вкладки.": "Not saved: {what}. They are kept in this browser and survive closing the tab.",
+    "Всё сохранено.": "Everything is saved.",
+    "Язык": "Language",
+    "Колесо мыши в календаре": "Mouse wheel in the calendar",
+    "Масштаб времени (Alt — прокрутка)": "Time zoom (Alt = scroll)",
+    "Прокрутка (Ctrl — масштаб)": "Scroll (Ctrl = zoom)",
+    "Масштаб растягивает сетку дня по вертикали вокруг курсора.": "Zoom stretches the day grid vertically around the cursor.",
+    "Слева, канбан справа": "Left, board on the right",
+    "Справа, канбан слева": "Right, board on the left",
+    "Расположение двух частей на широком экране.": "Layout of the two panes on a wide screen.",
+    "Скольжение между днями": "Slide between days",
+    "Как долго карточка плывёт в соседний день, когда вы тянете её в календаре. 0 — мгновенно.": "How long a card slides to the neighboring day when you drag it in the calendar. 0 = instant.",
+    "Зона растягивания по краям блока": "Resize zone at block edges",
+    "Сколько пикселей у верхнего и нижнего края блока в календаре занимает растягивание. Остальное: перенос.": "How many pixels at the top and bottom edge of a calendar block are used for resizing. The rest moves it.",
+    "Контур при наведении": "Hover outline",
+    "Как быстро появляется и гаснет рамка вокруг карточки под курсором. 0 — мгновенно.": "How fast the outline around the hovered card fades in and out. 0 = instant.",
+    "Сохранять после паузы": "Save after a pause",
+    "15 секунд": "15 seconds",
+    "30 секунд": "30 seconds",
+    "1 минута": "1 minute",
+    "2 минуты": "2 minutes",
+    "5 минут": "5 minutes",
+    "10 минут": "10 minutes",
+    "Не сохранять по паузе": "Don't save on pause",
+    "Пока вы двигаете, пишете или держите открытым окно задачи, ничего не отправляется. Отсчёт начинается с последнего действия.": "While you drag, type or keep a task window open, nothing is sent. The countdown starts from your last action.",
+    "Сохранять при уходе со вкладки": "Save when leaving the tab",
+    "Переключились на другую вкладку, свернули браузер или заблокировали телефон.": "You switched to another tab, minimized the browser or locked your phone.",
+    "Сохранять при потере фокуса окна": "Save when the window loses focus",
+    "Переключились в другую программу, а вкладка осталась на экране.": "You switched to another app while the tab stays on screen.",
+    "Объединять коммиты": "Squash commits",
+    "Нет, каждое сохранение отдельно": "No, each save separately",
+    "За час": "Per hour",
+    "За день": "Per day",
+    "Новое сохранение заменяет предыдущий коммит сайта за этот час или день, если после него никто ничего не коммитил. История остаётся короткой, все действия перечислены в одном сообщении.": "A new save replaces the site's previous commit within the same hour or day, as long as nobody committed after it. History stays short and all actions are listed in one message.",
+    "Проверять изменения": "Check for changes",
+    "Раз в 30 секунд": "Every 30 seconds",
+    "Раз в минуту": "Every minute",
+    "Раз в 5 минут": "Every 5 minutes",
+    "Как часто подтягивать правки Claude и других устройств. Также проверяется при возврате на вкладку.": "How often to pull edits from Claude and other devices. Also checked when you return to the tab.",
+    "Имя устройства": "Device name",
+    "Пишется в коммит, чтобы было видно, откуда правка.": "Written into the commit so you can see where an edit came from.",
+    "Подключить": "Connect",
+    "Заполните все три поля.": "Fill in all three fields.",
+    "Проверяю…": "Checking…",
+    "Токен не подошёл. Проверьте, что скопировали его целиком.": "The token didn't work. Make sure you copied all of it.",
+    "Репозиторий не найден, или у токена нет к нему доступа. Проверьте название и Repository access у токена.": "Repository not found, or the token has no access to it. Check the name and the token's Repository access.",
+    "GitHub ответил: {m}": "GitHub replied: {m}",
+    "Нет связи с GitHub. Проверьте интернет.": "Can't reach GitHub. Check your internet connection.",
+    "Создайте для этого репозитория токен с доступом Contents: Read and write. Токен останется только в этом браузере.": "Create a token for this repository with Contents: Read and write access. The token stays only in this browser.",
+    "Владелец": "Owner",
+    "Репозиторий": "Repository",
+    "Токен GitHub": "GitHub token",
+    "Подключить GitHub": "Connect GitHub",
+    "Начать локально": "Start locally",
+    "Где хранить задачи?": "Where should your tasks live?",
+    "Локально": "Local",
+    "Рекомендуем": "Recommended",
+    "Всё остаётся в этом браузере. Без аккаунта, работает без интернета. Другие устройства и Claude эти данные не увидят.": "Everything stays in this browser. No account, works offline. Other devices and Claude won't see this data.",
+    "Бесплатная синхронизация через GitHub": "Free sync via GitHub",
+    "Задачи лежат в вашем приватном репозитории GitHub: они одинаковы на всех устройствах, у них есть история, и с ними может работать Claude.": "Your tasks live in your own private GitHub repository: identical on every device, with full history, and Claude can work with them.",
+    "Работа": "Work",
+    "Дом": "Home",
+    "Финансы": "Finances",
+    "Здоровье": "Health",
+    "Еда": "Food",
+    "Сон": "Sleep",
+    "Личное": "Personal",
+    "Красный": "Red",
+    "Оранжевый": "Orange",
+    "Жёлтый": "Yellow",
+    "Зелёный": "Green",
+    "Бирюзовый": "Teal",
+    "Синий": "Blue",
+    "Фиолетовый": "Purple",
+    "Розовый": "Pink",
+    "Не начато": "Not started"
+   },
+   "de": {
+    "Бэклог": "Backlog",
+    "В работе": "In Arbeit",
+    "Ждёт": "Wartet",
+    "Готово": "Erledigt",
+    "Календарь": "Kalender",
+    "Доска": "Board",
+    "АНАЛИЗ": "ANALYSE",
+    "+ Задача": "+ Aufgabe",
+    "Поиск по задачам": "Aufgaben suchen",
+    "Настройки": "Einstellungen",
+    "Нет связи с GitHub": "Keine Verbindung zu GitHub",
+    "Ветка изменилась": "Der Branch hat sich geändert",
+    "Не удалось сохранить: в браузере нет места": "Speichern fehlgeschlagen: Im Browser ist kein Platz mehr",
+    ": файл повреждён": ": Datei ist beschädigt",
+    "не сохранено {what}": "{what} nicht gespeichert",
+    "{n} действие|{n} действия|{n} действий": "{n} Aktion|{n} Aktionen",
+    "Сохранено на этом устройстве": "Auf diesem Gerät gespeichert",
+    "Нет доступа: проверьте токен": "Kein Zugriff: Token prüfen",
+    "Сохраняю…": "Speichere…",
+    "Офлайн": "Offline",
+    "Ошибка сохранения, ": "Speichern fehlgeschlagen, ",
+    "Загружаю…": "Lade…",
+    "Сохранено": "Gespeichert",
+    "Нажмите, чтобы сохранить сейчас": "Klicken, um jetzt zu speichern",
+    "Последний коммит: {s}": "Letzter Commit: {s}",
+    "Всё сохранено": "Alles gespeichert",
+    "Канбан": "Kanban",
+    " (нажмите, чтобы сменить)": " (zum Ändern klicken)",
+    "Открыть": "Öffnen",
+    "Убрать из календаря (останется в канбане)": "Aus dem Kalender entfernen (bleibt im Kanban)",
+    "Убрать из календаря": "Aus dem Kalender entfernen",
+    "Снять «в процессе»": "„In Arbeit“ entfernen",
+    "В процессе": "In Arbeit",
+    "Вернуть в работу": "Wieder öffnen",
+    "Выполнено": "Erledigt",
+    "Дата": "Datum",
+    "Сегодня": "Heute",
+    "Завтра": "Morgen",
+    "На неделе": "Diese Woche",
+    "Без даты": "Kein Datum",
+    "убрать дату с карточки": "Datum von der Karte entfernen",
+    "Цвет карточки": "Kartenfarbe",
+    "Метки": "Labels",
+    "Значки": "Symbole",
+    "Приоритет": "Priorität",
+    "Нет": "Keine",
+    "Колонка": "Spalte",
+    "Открепить от разбора": "Für die Planung freigeben",
+    "Не двигать при разборе": "Bei der Planung nicht verschieben",
+    "Дублировать": "Duplizieren",
+    " (копия)": " (Kopie)",
+    "Удалить": "Löschen",
+    "Точно удалить?": "Wirklich löschen?",
+    "Срок": "Fällig",
+    "Стоит в календаре": "Im Kalender eingeplant",
+    "Inbox и недели {a}–{b}": "Inbox und Wochen {a}–{b}",
+    "Inbox и неделя {a}": "Inbox und Woche {a}",
+    "Показывать распорядок": "Routinen anzeigen",
+    "Название колонки": "Spaltenname",
+    "Удалить колонку": "Spalte löschen",
+    "Удалить?": "Löschen?",
+    "+ Добавить карточку": "+ Karte hinzufügen",
+    "Название задачи": "Aufgabenname",
+    "+ Колонка": "+ Spalte",
+    " мин": " Min.",
+    "Перенесена: ": "Übertragen von: ",
+    "Назад": "Zurück",
+    "Вперёд": "Weiter",
+    "Месяц": "Monat",
+    "3 дня": "3 Tage",
+    "День": "Tag",
+    "Inbox, без даты": "Inbox, ohne Datum",
+    "Пусто. Новые задачи без даты попадают сюда, Claude распределяет их при разборе.": "Leer. Neue Aufgaben ohne Datum landen hier, Claude verteilt sie bei der Planung.",
+    "Добавить задачу": "Aufgabe hinzufügen",
+    "Добавить задачу на ": "Aufgabe hinzufügen am ",
+    "ещё {n}": "{n} weitere",
+    "Распорядок скрыт в месяце. Включите «Показывать распорядок» над доской.": "Routinen sind in der Monatsansicht ausgeblendet. Aktiviere „Routinen anzeigen“ über dem Board.",
+    "Название": "Titel",
+    "весь день": "ganztägig",
+    "Задача на весь день": "Ganztägige Aufgabe",
+    "Что нужно сделать": "Was ist zu tun?",
+    "Описание: чем подробнее, тем точнее Claude оценит срок": "Beschreibung: je genauer, desto besser kann Claude die Dauer schätzen",
+    "Без области": "Kein Bereich",
+    "Не задан": "Nicht gesetzt",
+    "P1 срочно и важно": "P1 dringend und wichtig",
+    "P2 важно": "P2 wichtig",
+    "P3 обычное": "P3 normal",
+    "P4 когда-нибудь": "P4 irgendwann",
+    "мин": "Min.",
+    "Введите название задачи.": "Gib einen Aufgabennamen ein.",
+    "Конец должен быть позже начала.": "Das Ende muss nach dem Beginn liegen.",
+    "Создать": "Erstellen",
+    "Сохранить": "Speichern",
+    "Отмена": "Abbrechen",
+    "Новая задача": "Neue Aufgabe",
+    "Задача": "Aufgabe",
+    "Распорядок": "Routine",
+    "Описание": "Beschreibung",
+    "Начало": "Beginn",
+    "Конец": "Ende",
+    "Оценка, мин": "Schätzung, Min.",
+    "Область": "Bereich",
+    "Для Claude": "Für Claude",
+    "Срок на карточке (только надпись)": "Fälligkeit auf der Karte (nur Beschriftung)",
+    "Срок до (для диапазона)": "Fällig bis (für einen Zeitraum)",
+    "Комментарий Claude: ": "Claudes Anmerkung: ",
+    "Переносилась с недель: ": "Übertragen aus den Wochen: ",
+    "Без даты задача лежит в Inbox. С датой и временем стоит в сетке дня.": "Ohne Datum liegt die Aufgabe in der Inbox. Mit Datum und Uhrzeit steht sie im Tagesraster.",
+    "Скопировать команду": "Befehl kopieren",
+    "Скопировано": "Kopiert",
+    "Нажмите Ctrl+C": "Strg+C drücken",
+    "Анализ": "Analyse",
+    "Анализ задач": "Aufgabenanalyse",
+    "Claude перенесёт невыполненное, разберёт Inbox, расставит приоритеты, сроки и время. 1. Скопируйте команду. 2. Откройте Claude Code и отправьте её. 3. Когда Claude закончит, обновления появятся здесь в течение минуты.": "Claude überträgt Unerledigtes, sortiert die Inbox und setzt Prioritäten, Fristen und Zeiten. 1. Kopiere den Befehl. 2. Öffne Claude Code und sende ihn ab. 3. Sobald Claude fertig ist, erscheinen die Änderungen hier innerhalb einer Minute.",
+    "Открыть Claude Code ↗": "Claude Code öffnen ↗",
+    "Отчёт последнего разбора": "Bericht der letzten Analyse",
+    "Отчёта пока нет.": "Noch kein Bericht.",
+    "Закрыть": "Schließen",
+    " с": " s",
+    "Данные хранятся только в этом браузере, без аккаунта и без сети.": "Deine Daten liegen nur in diesem Browser: ohne Konto, ohne Netzwerk.",
+    "Подключено: {repo}, ветка {branch}.": "Verbunden: {repo}, Branch {branch}.",
+    "Сохранить сейчас": "Jetzt speichern",
+    "Сменить способ хранения": "Speicherart ändern",
+    "Отключить это устройство": "Dieses Gerät trennen",
+    "Вернуться к выбору? Данные останутся в этом браузере.": "Zurück zur Auswahl? Deine Daten bleiben in diesem Browser.",
+    "Токен и несохранённое удалятся. Точно?": "Token und ungespeicherte Änderungen werden gelöscht. Sicher?",
+    "Скачать резервную копию": "Backup herunterladen",
+    "Не сохранено: {what}. Они хранятся в этом браузере и не пропадут при закрытии вкладки.": "Nicht gespeichert: {what}. Sie bleiben in diesem Browser erhalten, auch wenn du den Tab schließt.",
+    "Всё сохранено.": "Alles gespeichert.",
+    "Язык": "Sprache",
+    "Колесо мыши в календаре": "Mausrad im Kalender",
+    "Масштаб времени (Alt — прокрутка)": "Zeitzoom (Alt = scrollen)",
+    "Прокрутка (Ctrl — масштаб)": "Scrollen (Strg = Zoom)",
+    "Масштаб растягивает сетку дня по вертикали вокруг курсора.": "Der Zoom streckt das Tagesraster vertikal um den Mauszeiger.",
+    "Слева, канбан справа": "Links, Board rechts",
+    "Справа, канбан слева": "Rechts, Board links",
+    "Расположение двух частей на широком экране.": "Anordnung der beiden Bereiche auf breiten Bildschirmen.",
+    "Скольжение между днями": "Gleiten zwischen Tagen",
+    "Как долго карточка плывёт в соседний день, когда вы тянете её в календаре. 0 — мгновенно.": "Wie lange eine Karte zum Nachbartag gleitet, wenn du sie im Kalender ziehst. 0 = sofort.",
+    "Зона растягивания по краям блока": "Größenänderungszone an den Blockrändern",
+    "Сколько пикселей у верхнего и нижнего края блока в календаре занимает растягивание. Остальное: перенос.": "Wie viele Pixel am oberen und unteren Rand eines Kalenderblocks zum Ändern der Größe dienen. Der Rest verschiebt ihn.",
+    "Контур при наведении": "Umriss beim Darüberfahren",
+    "Как быстро появляется и гаснет рамка вокруг карточки под курсором. 0 — мгновенно.": "Wie schnell der Rahmen um die Karte unter dem Mauszeiger ein- und ausblendet. 0 = sofort.",
+    "Сохранять после паузы": "Nach einer Pause speichern",
+    "15 секунд": "15 Sekunden",
+    "30 секунд": "30 Sekunden",
+    "1 минута": "1 Minute",
+    "2 минуты": "2 Minuten",
+    "5 минут": "5 Minuten",
+    "10 минут": "10 Minuten",
+    "Не сохранять по паузе": "Nicht nach Pause speichern",
+    "Пока вы двигаете, пишете или держите открытым окно задачи, ничего не отправляется. Отсчёт начинается с последнего действия.": "Solange du ziehst, tippst oder ein Aufgabenfenster offen hältst, wird nichts gesendet. Die Zeit zählt ab deiner letzten Aktion.",
+    "Сохранять при уходе со вкладки": "Beim Verlassen des Tabs speichern",
+    "Переключились на другую вкладку, свернули браузер или заблокировали телефон.": "Du hast den Tab gewechselt, den Browser minimiert oder das Telefon gesperrt.",
+    "Сохранять при потере фокуса окна": "Beim Fokusverlust des Fensters speichern",
+    "Переключились в другую программу, а вкладка осталась на экране.": "Du hast zu einem anderen Programm gewechselt, der Tab bleibt sichtbar.",
+    "Объединять коммиты": "Commits zusammenfassen",
+    "Нет, каждое сохранение отдельно": "Nein, jedes Speichern einzeln",
+    "За час": "Pro Stunde",
+    "За день": "Pro Tag",
+    "Новое сохранение заменяет предыдущий коммит сайта за этот час или день, если после него никто ничего не коммитил. История остаётся короткой, все действия перечислены в одном сообщении.": "Ein neues Speichern ersetzt den vorherigen Commit der Seite in derselben Stunde bzw. am selben Tag, sofern danach niemand committet hat. Der Verlauf bleibt kurz, alle Aktionen stehen in einer Nachricht.",
+    "Проверять изменения": "Auf Änderungen prüfen",
+    "Раз в 30 секунд": "Alle 30 Sekunden",
+    "Раз в минуту": "Jede Minute",
+    "Раз в 5 минут": "Alle 5 Minuten",
+    "Как часто подтягивать правки Claude и других устройств. Также проверяется при возврате на вкладку.": "Wie oft Änderungen von Claude und anderen Geräten geladen werden. Wird auch beim Zurückkehren zum Tab geprüft.",
+    "Имя устройства": "Gerätename",
+    "Пишется в коммит, чтобы было видно, откуда правка.": "Wird in den Commit geschrieben, damit sichtbar ist, woher eine Änderung stammt.",
+    "Подключить": "Verbinden",
+    "Заполните все три поля.": "Fülle alle drei Felder aus.",
+    "Проверяю…": "Prüfe…",
+    "Токен не подошёл. Проверьте, что скопировали его целиком.": "Der Token hat nicht funktioniert. Prüfe, ob du ihn vollständig kopiert hast.",
+    "Репозиторий не найден, или у токена нет к нему доступа. Проверьте название и Repository access у токена.": "Repository nicht gefunden oder der Token hat keinen Zugriff darauf. Prüfe den Namen und den „Repository access“ des Tokens.",
+    "GitHub ответил: {m}": "GitHub antwortete: {m}",
+    "Нет связи с GitHub. Проверьте интернет.": "Keine Verbindung zu GitHub. Prüfe deine Internetverbindung.",
+    "Создайте для этого репозитория токен с доступом Contents: Read and write. Токен останется только в этом браузере.": "Erstelle für dieses Repository einen Token mit Contents: Read and write. Der Token bleibt nur in diesem Browser.",
+    "Владелец": "Besitzer",
+    "Репозиторий": "Repository",
+    "Токен GitHub": "GitHub-Token",
+    "Подключить GitHub": "GitHub verbinden",
+    "Начать локально": "Lokal starten",
+    "Где хранить задачи?": "Wo sollen deine Aufgaben liegen?",
+    "Локально": "Lokal",
+    "Рекомендуем": "Empfohlen",
+    "Всё остаётся в этом браузере. Без аккаунта, работает без интернета. Другие устройства и Claude эти данные не увидят.": "Alles bleibt in diesem Browser. Ohne Konto, funktioniert offline. Andere Geräte und Claude sehen diese Daten nicht.",
+    "Бесплатная синхронизация через GitHub": "Kostenloser Sync über GitHub",
+    "Задачи лежат в вашем приватном репозитории GitHub: они одинаковы на всех устройствах, у них есть история, и с ними может работать Claude.": "Deine Aufgaben liegen in deinem privaten GitHub-Repository: auf allen Geräten gleich, mit Verlauf, und Claude kann damit arbeiten.",
+    "Работа": "Arbeit",
+    "Дом": "Zuhause",
+    "Финансы": "Finanzen",
+    "Здоровье": "Gesundheit",
+    "Еда": "Essen",
+    "Сон": "Schlaf",
+    "Личное": "Persönlich",
+    "Красный": "Rot",
+    "Оранжевый": "Orange",
+    "Жёлтый": "Gelb",
+    "Зелёный": "Grün",
+    "Бирюзовый": "Türkis",
+    "Синий": "Blau",
+    "Фиолетовый": "Violett",
+    "Розовый": "Rosa",
+    "Не начато": "Nicht begonnen"
+   },
+   "zh": {
+    "Бэклог": "待办",
+    "В работе": "进行中",
+    "Ждёт": "等待中",
+    "Готово": "已完成",
+    "Календарь": "日历",
+    "Доска": "看板",
+    "АНАЛИЗ": "分析",
+    "+ Задача": "+ 任务",
+    "Поиск по задачам": "搜索任务",
+    "Настройки": "设置",
+    "Нет связи с GitHub": "无法连接 GitHub",
+    "Ветка изменилась": "分支已变更",
+    "Не удалось сохранить: в браузере нет места": "无法保存：浏览器存储空间已满",
+    ": файл повреждён": "：文件已损坏",
+    "не сохранено {what}": "{what}未保存",
+    "{n} действие|{n} действия|{n} действий": "{n} 个操作",
+    "Сохранено на этом устройстве": "已保存在本设备",
+    "Нет доступа: проверьте токен": "无权限：请检查令牌",
+    "Сохраняю…": "正在保存…",
+    "Офлайн": "离线",
+    "Ошибка сохранения, ": "保存失败，",
+    "Загружаю…": "加载中…",
+    "Сохранено": "已保存",
+    "Нажмите, чтобы сохранить сейчас": "点击立即保存",
+    "Последний коммит: {s}": "最近提交：{s}",
+    "Всё сохранено": "全部已保存",
+    "Канбан": "看板",
+    " (нажмите, чтобы сменить)": "（点击切换）",
+    "Открыть": "打开",
+    "Убрать из календаря (останется в канбане)": "从日历移除（仍保留在看板）",
+    "Убрать из календаря": "从日历移除",
+    "Снять «в процессе»": "取消“进行中”",
+    "В процессе": "进行中",
+    "Вернуть в работу": "重新打开",
+    "Выполнено": "已完成",
+    "Дата": "日期",
+    "Сегодня": "今天",
+    "Завтра": "明天",
+    "На неделе": "本周",
+    "Без даты": "无日期",
+    "убрать дату с карточки": "移除卡片上的日期",
+    "Цвет карточки": "卡片颜色",
+    "Метки": "标签",
+    "Значки": "图标",
+    "Приоритет": "优先级",
+    "Нет": "无",
+    "Колонка": "列",
+    "Открепить от разбора": "允许规划时移动",
+    "Не двигать при разборе": "规划时不要移动",
+    "Дублировать": "复制",
+    " (копия)": "（副本）",
+    "Удалить": "删除",
+    "Точно удалить?": "确定删除？",
+    "Срок": "截止",
+    "Стоит в календаре": "已排入日历",
+    "Inbox и недели {a}–{b}": "收件箱和第 {a}–{b} 周",
+    "Inbox и неделя {a}": "收件箱和第 {a} 周",
+    "Показывать распорядок": "显示日常安排",
+    "Название колонки": "列名称",
+    "Удалить колонку": "删除列",
+    "Удалить?": "删除？",
+    "+ Добавить карточку": "+ 添加卡片",
+    "Название задачи": "任务名称",
+    "+ Колонка": "+ 列",
+    " мин": " 分钟",
+    "Перенесена: ": "已顺延自：",
+    "Назад": "上一页",
+    "Вперёд": "下一页",
+    "Месяц": "月",
+    "3 дня": "3天",
+    "День": "日",
+    "Inbox, без даты": "收件箱（无日期）",
+    "Пусто. Новые задачи без даты попадают сюда, Claude распределяет их при разборе.": "空。没有日期的新任务会出现在这里，Claude 会在规划时分配它们。",
+    "Добавить задачу": "添加任务",
+    "Добавить задачу на ": "添加任务到 ",
+    "ещё {n}": "还有 {n} 项",
+    "Распорядок скрыт в месяце. Включите «Показывать распорядок» над доской.": "月视图中已隐藏日常安排。请在看板上方开启“显示日常安排”。",
+    "Название": "标题",
+    "весь день": "全天",
+    "Задача на весь день": "全天任务",
+    "Что нужно сделать": "要做什么",
+    "Описание: чем подробнее, тем точнее Claude оценит срок": "描述：越详细，Claude 对时长的估计越准确",
+    "Без области": "无领域",
+    "Не задан": "未设置",
+    "P1 срочно и важно": "P1 紧急且重要",
+    "P2 важно": "P2 重要",
+    "P3 обычное": "P3 一般",
+    "P4 когда-нибудь": "P4 以后再说",
+    "мин": "分钟",
+    "Введите название задачи.": "请输入任务名称。",
+    "Конец должен быть позже начала.": "结束时间必须晚于开始时间。",
+    "Создать": "创建",
+    "Сохранить": "保存",
+    "Отмена": "取消",
+    "Новая задача": "新任务",
+    "Задача": "任务",
+    "Распорядок": "日常安排",
+    "Описание": "描述",
+    "Начало": "开始",
+    "Конец": "结束",
+    "Оценка, мин": "预估（分钟）",
+    "Область": "领域",
+    "Для Claude": "给 Claude",
+    "Срок на карточке (только надпись)": "卡片上的截止日期（仅作标注）",
+    "Срок до (для диапазона)": "截止到（用于日期范围）",
+    "Комментарий Claude: ": "Claude 的备注：",
+    "Переносилась с недель: ": "已顺延自第几周：",
+    "Без даты задача лежит в Inbox. С датой и временем стоит в сетке дня.": "没有日期的任务在收件箱中。设置日期和时间后会出现在日视图网格里。",
+    "Скопировать команду": "复制命令",
+    "Скопировано": "已复制",
+    "Нажмите Ctrl+C": "请按 Ctrl+C",
+    "Анализ": "分析",
+    "Анализ задач": "任务分析",
+    "Claude перенесёт невыполненное, разберёт Inbox, расставит приоритеты, сроки и время. 1. Скопируйте команду. 2. Откройте Claude Code и отправьте её. 3. Когда Claude закончит, обновления появятся здесь в течение минуты.": "Claude 会顺延未完成的任务、整理收件箱，并安排优先级、截止日期和时间。1. 复制命令。2. 打开 Claude Code 并发送。3. Claude 完成后，更新会在一分钟内显示在这里。",
+    "Открыть Claude Code ↗": "打开 Claude Code ↗",
+    "Отчёт последнего разбора": "上次分析报告",
+    "Отчёта пока нет.": "暂无报告。",
+    "Закрыть": "关闭",
+    " с": " 秒",
+    "Данные хранятся только в этом браузере, без аккаунта и без сети.": "数据只保存在此浏览器中，无需账号，也无需联网。",
+    "Подключено: {repo}, ветка {branch}.": "已连接：{repo}，分支 {branch}。",
+    "Сохранить сейчас": "立即保存",
+    "Сменить способ хранения": "更改存储方式",
+    "Отключить это устройство": "断开此设备",
+    "Вернуться к выбору? Данные останутся в этом браузере.": "返回选择页？数据会保留在此浏览器中。",
+    "Токен и несохранённое удалятся. Точно?": "令牌和未保存的更改将被删除。确定吗？",
+    "Скачать резервную копию": "下载备份",
+    "Не сохранено: {what}. Они хранятся в этом браузере и не пропадут при закрытии вкладки.": "未保存：{what}。它们保存在此浏览器中，关闭标签页也不会丢失。",
+    "Всё сохранено.": "全部已保存。",
+    "Язык": "语言",
+    "Колесо мыши в календаре": "日历中的鼠标滚轮",
+    "Масштаб времени (Alt — прокрутка)": "缩放时间（Alt = 滚动）",
+    "Прокрутка (Ctrl — масштаб)": "滚动（Ctrl = 缩放）",
+    "Масштаб растягивает сетку дня по вертикали вокруг курсора.": "缩放会以光标为中心纵向拉伸日视图网格。",
+    "Слева, канбан справа": "在左侧，看板在右侧",
+    "Справа, канбан слева": "在右侧，看板在左侧",
+    "Расположение двух частей на широком экране.": "宽屏下两个区域的排列。",
+    "Скольжение между днями": "跨天滑动",
+    "Как долго карточка плывёт в соседний день, когда вы тянете её в календаре. 0 — мгновенно.": "在日历中拖动卡片时，滑到相邻日期所需的时间。0 表示立即。",
+    "Зона растягивания по краям блока": "块边缘的调整大小区域",
+    "Сколько пикселей у верхнего и нижнего края блока в календаре занимает растягивание. Остальное: перенос.": "日历块上下边缘多少像素用于调整大小，其余部分用于移动。",
+    "Контур при наведении": "悬停轮廓",
+    "Как быстро появляется и гаснет рамка вокруг карточки под курсором. 0 — мгновенно.": "光标下卡片轮廓出现和消失的速度。0 表示立即。",
+    "Сохранять после паузы": "停顿后保存",
+    "15 секунд": "15 秒",
+    "30 секунд": "30 秒",
+    "1 минута": "1 分钟",
+    "2 минуты": "2 分钟",
+    "5 минут": "5 分钟",
+    "10 минут": "10 分钟",
+    "Не сохранять по паузе": "停顿时不保存",
+    "Пока вы двигаете, пишете или держите открытым окно задачи, ничего не отправляется. Отсчёт начинается с последнего действия.": "拖动、输入或打开任务窗口时不会发送任何内容。倒计时从你的最后一次操作开始。",
+    "Сохранять при уходе со вкладки": "离开标签页时保存",
+    "Переключились на другую вкладку, свернули браузер или заблокировали телефон.": "切换到其他标签页、最小化浏览器或锁定手机时。",
+    "Сохранять при потере фокуса окна": "窗口失去焦点时保存",
+    "Переключились в другую программу, а вкладка осталась на экране.": "切换到其他程序，而标签页仍显示在屏幕上时。",
+    "Объединять коммиты": "合并提交",
+    "Нет, каждое сохранение отдельно": "不合并，每次保存单独提交",
+    "За час": "每小时",
+    "За день": "每天",
+    "Новое сохранение заменяет предыдущий коммит сайта за этот час или день, если после него никто ничего не коммитил. История остаётся короткой, все действия перечислены в одном сообщении.": "如果之后没有其他人提交，新的保存会替换网站在同一小时或同一天内的上一次提交。历史记录保持简短，所有操作列在同一条消息中。",
+    "Проверять изменения": "检查更改",
+    "Раз в 30 секунд": "每 30 秒",
+    "Раз в минуту": "每分钟",
+    "Раз в 5 минут": "每 5 分钟",
+    "Как часто подтягивать правки Claude и других устройств. Также проверяется при возврате на вкладку.": "多久拉取一次 Claude 和其他设备的修改。返回标签页时也会检查。",
+    "Имя устройства": "设备名称",
+    "Пишется в коммит, чтобы было видно, откуда правка.": "写入提交，便于看出修改来自哪台设备。",
+    "Подключить": "连接",
+    "Заполните все три поля.": "请填写全部三个字段。",
+    "Проверяю…": "正在检查…",
+    "Токен не подошёл. Проверьте, что скопировали его целиком.": "令牌无效。请确认已完整复制。",
+    "Репозиторий не найден, или у токена нет к нему доступа. Проверьте название и Repository access у токена.": "找不到仓库，或令牌无权访问。请检查名称以及令牌的 Repository access。",
+    "GitHub ответил: {m}": "GitHub 返回：{m}",
+    "Нет связи с GitHub. Проверьте интернет.": "无法连接 GitHub。请检查网络。",
+    "Создайте для этого репозитория токен с доступом Contents: Read and write. Токен останется только в этом браузере.": "为此仓库创建一个具有 Contents: Read and write 权限的令牌。令牌只保存在此浏览器中。",
+    "Владелец": "所有者",
+    "Репозиторий": "仓库",
+    "Токен GitHub": "GitHub 令牌",
+    "Подключить GitHub": "连接 GitHub",
+    "Начать локально": "本地开始使用",
+    "Где хранить задачи?": "任务存放在哪里？",
+    "Локально": "本地",
+    "Рекомендуем": "推荐",
+    "Всё остаётся в этом браузере. Без аккаунта, работает без интернета. Другие устройства и Claude эти данные не увидят.": "一切都保存在此浏览器中。无需账号，可离线使用。其他设备和 Claude 看不到这些数据。",
+    "Бесплатная синхронизация через GitHub": "通过 GitHub 免费同步",
+    "Задачи лежат в вашем приватном репозитории GitHub: они одинаковы на всех устройствах, у них есть история, и с ними может работать Claude.": "任务保存在你自己的私有 GitHub 仓库中：所有设备保持一致，带有历史记录，并且 Claude 可以参与处理。",
+    "Работа": "工作",
+    "Дом": "家",
+    "Финансы": "财务",
+    "Здоровье": "健康",
+    "Еда": "饮食",
+    "Сон": "睡眠",
+    "Личное": "个人",
+    "Красный": "红色",
+    "Оранжевый": "橙色",
+    "Жёлтый": "黄色",
+    "Зелёный": "绿色",
+    "Бирюзовый": "青色",
+    "Синий": "蓝色",
+    "Фиолетовый": "紫色",
+    "Розовый": "粉色",
+    "Не начато": "未开始"
+   }
+  };
+  var LANGS = [['en', 'English'], ['ru', 'Русский'], ['de', 'Deutsch'], ['zh', '中文']];
+  var LOCALES = { en: 'en', ru: 'ru', de: 'de', zh: 'zh-CN' };
+  var LANG = 'en';
+  var fmtShort, fmtMonth, fmtDay, fmtDow, fmtTime, DOW;
+  function tr(key, vars) {
+    var s = LANG === 'ru' ? key : ((I18N[LANG] && I18N[LANG][key]) || key);
+    if (vars) s = s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; });
+    return s;
+  }
+  // key: формы русского языка через «|» (один, два, пять); для остальных языков перевод тоже через «|»
+  function trn(key, n) {
+    var src = LANG === 'ru' ? key : ((I18N[LANG] && I18N[LANG][key]) || key), f = src.split('|'), i;
+    if (LANG === 'ru') { var m = n % 10, h = n % 100; i = m === 1 && h !== 11 ? 0 : m >= 2 && m <= 4 && (h < 12 || h > 14) ? 1 : 2; }
+    else if (LANG === 'zh') i = 0; else i = n === 1 ? 0 : 1;
+    return (f[Math.min(i, f.length - 1)] || '').replace('{n}', n);
+  }
+  function setLang(l) {
+    LANG = LOCALES[l] ? l : 'en';
+    var loc = LOCALES[LANG];
+    fmtShort = new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'short' });
+    fmtMonth = new Intl.DateTimeFormat(loc, { month: 'long', year: 'numeric' });
+    fmtDay = new Intl.DateTimeFormat(loc, { weekday: 'long', day: 'numeric', month: 'long' });
+    fmtDow = new Intl.DateTimeFormat(loc, { weekday: 'short' });
+    fmtTime = new Intl.DateTimeFormat(loc, { hour: '2-digit', minute: '2-digit' });
+    DOW = []; for (var i = 0; i < 7; i++) DOW.push(fmtDow.format(new Date(2024, 0, 1 + i)));
+    document.documentElement.lang = loc;
+    var map = { 'mt-cal': tr('Календарь'), 'mt-board': tr('Доска'), 'btn-claude': tr('АНАЛИЗ'), 'new-task': tr('+ Задача') };
+    for (var id in map) { var n = document.getElementById(id); if (n) n.textContent = tr(map[id]); }
+    var se = document.getElementById('search'); if (se) { se.placeholder = tr('Поиск по задачам'); se.setAttribute('aria-label', tr('Поиск по задачам')); }
+    var st = document.getElementById('btn-settings'); if (st) { st.title = tr('Настройки'); st.setAttribute('aria-label', tr('Настройки')); }
+  }
 
   /* ---------- утилиты ---------- */
   function $(id) { return document.getElementById(id); }
@@ -450,7 +1103,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (res.status === 409 || res.status === 422) e.conflict = true;
     return e;
   }
-  function netError(e) { var x = new Error('Нет связи с GitHub'); x.offline = true; x.cause = e; return x; }
+  function netError(e) { var x = new Error(tr('Нет связи с GitHub')); x.offline = true; x.cause = e; return x; }
 
   function GitHubBackend(cfg) { this.cfg = cfg; }
   GitHubBackend.prototype.base = function () {
@@ -501,7 +1154,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       return self.api('POST', '/git/commits', { message: message, tree: tree.sha, parents: squash ? head.parents : [head.sha] });
     }).then(function (c) {
       var guard = squash ? self.api('GET', self.refPath()).then(function (r) {
-        if (r.object.sha !== head.sha) { var e = new Error('Ветка изменилась'); e.conflict = true; throw e; }
+        if (r.object.sha !== head.sha) { var e = new Error(tr('Ветка изменилась')); e.conflict = true; throw e; }
       }) : Promise.resolve();
       return guard.then(function () {
         return self.api('PATCH', '/git/refs/heads/' + self.cfg.branch, { sha: c.sha, force: !!squash });
@@ -509,32 +1162,23 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     });
   };
 
-  function DemoBackend() {
-    var mon = weekStartOf(weekId(today)), files = {}, n = 0, self = this;
-    function d(i) { return iso(addDays(mon, i)); }
-    var wk = { week: weekId(today), start: iso(mon), tasks: [] };
-    var routine = [['Сон', 'sleep', 0, 450], ['Завтрак', 'food', 485, 510], ['Обед', 'food', 780, 825], ['Ужин', 'food', 1140, 1180], ['Разобрать посуду', 'home', 1180, 1195]];
-    for (var i = 0; i < 7; i++) routine.forEach(function (r) { wk.tasks.push({ id: 'r_' + r[0] + i, title: r[0], status: 'backlog', date: d(i), start: r[2], end: r[3], area: r[1], kind: 'routine' }); });
-    var di = (today.getDay() + 6) % 7;
-    wk.tasks.push({ id: 'd1', title: 'Подготовить отчёт за месяц', desc: 'Цифры из таблицы продаж.', status: 'doing', date: d(di), start: 570, end: 690, priority: 1, estimate: 120, area: 'work', aiNote: 'Срок завтра, лучше делать утром, пока свежая голова.' });
-    wk.tasks.push({ id: 'd2', title: 'Гантели', status: 'backlog', date: d(di), start: 1080, end: 1120, area: 'health', kind: 'routine' });
-    wk.tasks.push({ id: 'd3', title: 'Оплатить счета', status: 'backlog', date: d(Math.min(6, di + 1)), start: 1110, end: 1135, priority: 2, estimate: 25, area: 'finance', carriedFrom: ['прошлая неделя'] });
-    files[P_BOARD] = JSON.stringify(DEFAULT_BOARD);
-    files[P_INBOX] = JSON.stringify({ tasks: [
-      { id: 'i1', title: 'Записаться к стоматологу', status: 'backlog', area: 'health', order: 1 },
-      { id: 'i2', title: 'Купить продукты на неделю', status: 'backlog', area: 'home', order: 2 },
-      { id: 'i3', title: 'Разобрать почту', status: 'backlog', area: 'work', order: 3 }] });
-    files[weekPath(wk.week)] = JSON.stringify(wk);
-    files[P_REPORT] = 'Это демо. В настоящем режиме здесь отчёт последнего разбора Claude: что перенесено, что расставлено и что не влезло.';
-    this.log = [];
-    this.get = function (p) { return p in files ? blobSha(files[p]).then(function (s) { return { sha: s, text: files[p] }; }) : Promise.resolve({ missing: true }); };
-    this.head = function () { var last = self.log[self.log.length - 1]; return Promise.resolve({ sha: 'c' + n, tree: 't' + n, parents: ['c' + (n - 1)], message: last || '' }); };
-    this.commit = function (head, texts, message, squash) {
-      for (var p in texts) files[p] = texts[p];
-      if (squash) self.log.pop();
-      self.log.push(message); n++;
-      return Promise.resolve({ sha: 'c' + n });
+  // Локальное хранилище: файлы лежат в localStorage этого браузера, интерфейс тот же, что у GitHubBackend.
+  function LocalBackend() {
+    var self = this;
+    function load() { return lsGet(LOCAL_KEY) || {}; }
+    this.get = function (p) {
+      var all = load();
+      return p in all ? blobSha(all[p]).then(function (sha) { return { sha: sha, text: all[p] }; }) : Promise.resolve({ missing: true });
     };
+    this.head = function () { return Promise.resolve({ sha: 'local', tree: 'local', parents: [], message: '' }); };
+    this.commit = function (head, texts) {
+      var all = load();
+      for (var p in texts) all[p] = texts[p];
+      try { localStorage.setItem(LOCAL_KEY, JSON.stringify(all)); }
+      catch (e) { return Promise.reject(new Error(tr('Не удалось сохранить: в браузере нет места'))); }
+      return Promise.resolve({ sha: 'local' });
+    };
+    this.exportAll = function () { return load(); };
   }
 
   /* ---------- состояние ---------- */
@@ -542,10 +1186,11 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   var ui = lsGet(UI_KEY) || {};
   PPM = clamp(+ui.ppm || 1, 0.4, 8);
   var DEFAULT_SETTINGS = { wheelZoom: true, layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
-    device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'телефон' : 'компьютер' };
+    lang: 'en', device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'phone' : 'computer' };
   var settings = Object.assign({}, DEFAULT_SETTINGS, ui.settings || {});
   document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms');
-  var backend = null, demo = false;
+  setLang(settings.lang);
+  var backend = null, mode = 'github';
   var files = {};
   var actions = [];            // несохранённые действия: { at, lines: [...], ops: [...] }
   var flushing = false, flushAgain = false, flushTimer = null, pollTimer = null, retryTimer = null;
@@ -561,14 +1206,15 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   var armTimers = {};
 
   function saveSettings() { ui.settings = settings; lsSet(UI_KEY, ui); }
-  function repoKey() { return demo ? null : cfg.owner + '/' + cfg.repo + '@' + cfg.branch; }
+  function repoKey() { return mode === 'local' ? 'local' : cfg.owner + '/' + cfg.repo + '@' + cfg.branch; }
+  function cacheOn() { return mode === 'github'; }
   function persistActions() { if (repoKey()) lsSet('tt-pending-v1:' + repoKey(), actions.length ? actions : null); }
   function cacheKey(p) { return 'tt-cache-v1:' + repoKey() + ':' + p; }
-  function cacheSave(p) { if (repoKey() && files[p]) lsSet(cacheKey(p), { base: files[p].base, sha: files[p].sha }); }
+  function cacheSave(p) { if (cacheOn() && files[p]) lsSet(cacheKey(p), { base: files[p].base, sha: files[p].sha }); }
 
   function isJsonPath(p) { return /\.json$/.test(p); }
   function defaultFor(p) {
-    if (p === P_BOARD) return clone(DEFAULT_BOARD);
+    if (p === P_BOARD) return defaultBoard();
     if (p === P_REPORT) return '';
     var m = /^data\/weeks\/(.+)\.json$/.exec(p);
     if (m) return { week: m[1], start: iso(weekStartOf(m[1])), tasks: [] };
@@ -589,7 +1235,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (!isJsonPath(p)) return text;
     var d = JSON.parse(text);
     if (p !== P_BOARD && !Array.isArray(d.tasks)) d.tasks = [];
-    if (p === P_BOARD && (!Array.isArray(d.columns) || !d.columns.length)) d.columns = clone(DEFAULT_BOARD.columns);
+    if (p === P_BOARD && (!Array.isArray(d.columns) || !d.columns.length)) d.columns = defaultBoard().columns;
     return d;
   }
 
@@ -620,14 +1266,14 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   function setBase(p, text, sha, etag) {
     var f = files[p];
     try { f.base = text == null ? defaultFor(p) : parseData(p, text); f.broken = false; }
-    catch (e) { f.broken = true; f.base = defaultFor(p); syncErr = { message: p + ': файл повреждён' }; }
+    catch (e) { f.broken = true; f.base = defaultFor(p); syncErr = { message: p + tr(': файл повреждён') }; }
     f.sha = sha || null; f.etag = etag || null;
     recompute(p); cacheSave(p);
   }
 
   function ensureFile(p) {
     if (files[p]) return files[p];
-    var c = repoKey() ? lsGet(cacheKey(p)) : null;
+    var c = cacheOn() ? lsGet(cacheKey(p)) : null;
     var f = files[p] = { base: c ? c.base : defaultFor(p), sha: c ? c.sha : null, etag: null, state: c ? 'cached' : 'loading', broken: false };
     recompute(p);
     loadFile(p);
@@ -665,7 +1311,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   }
   function scheduleFlush() {
     clearTimeout(flushTimer);
-    if (actions.length && backend && settings.idle > 0) flushTimer = setTimeout(function () { flush('idle'); }, settings.idle * 1000);
+    if (actions.length && backend && mode === 'local') flushTimer = setTimeout(function () { flush('local'); }, 250);
+    else if (actions.length && backend && settings.idle > 0) flushTimer = setTimeout(function () { flush('idle'); }, settings.idle * 1000);
     setSync();
   }
   function activity() { if (actions.length) scheduleFlush(); }
@@ -765,7 +1412,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   }
 
   function poll() {
-    if (!backend || demo || document.hidden || flushing) return;
+    if (!backend || mode === 'local' || document.hidden || flushing) return;
     tickToday();
     Object.keys(files).forEach(function (p) {
       var f = files[p];
@@ -782,24 +1429,23 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   }
   function schedulePoll() { clearInterval(pollTimer); pollTimer = setInterval(poll, Math.max(15, settings.poll) * 1000); }
 
-  function plural(n, a, b, c) { var m = n % 10, h = n % 100; return n + ' ' + (m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 12 || h > 14) ? b : c); }
   function setSync() {
     var s = $('sync');
     if (!backend) { s.hidden = true; return; }
     s.hidden = false;
     var loading = Object.keys(files).some(function (p) { return files[p].state === 'loading'; });
-    var n = actions.length, pend = n ? 'не сохранено ' + plural(n, 'действие', 'действия', 'действий') : '';
+    var n = actions.length, pend = n ? tr('не сохранено {what}', { what: trn('{n} действие|{n} действия|{n} действий', n) }) : '';
     var st, txt;
-    if (demo) { st = 'demo'; txt = 'Демо' + (n ? ', ' + pend : ', без сохранения в GitHub'); }
-    else if (syncErr && syncErr.auth) { st = 'error'; txt = 'Нет доступа: проверьте токен'; }
-    else if (flushing) { st = 'busy'; txt = 'Сохраняю…'; }
-    else if (syncErr && syncErr.offline) { st = 'error'; txt = 'Офлайн' + (n ? ', ' + pend : ''); }
-    else if (syncErr && n) { st = 'error'; txt = 'Ошибка сохранения, ' + pend; }
+    if (mode === 'local' && !syncErr && !n) { st = 'ok'; txt = tr('Сохранено на этом устройстве'); }
+    else if (syncErr && syncErr.auth) { st = 'error'; txt = tr('Нет доступа: проверьте токен'); }
+    else if (flushing) { st = 'busy'; txt = tr('Сохраняю…'); }
+    else if (syncErr && syncErr.offline) { st = 'error'; txt = tr('Офлайн') + (n ? ', ' + pend : ''); }
+    else if (syncErr && n) { st = 'error'; txt = tr('Ошибка сохранения, ') + pend; }
     else if (n) { st = 'busy'; txt = cap(pend); }
-    else if (loading) { st = 'busy'; txt = 'Загружаю…'; }
-    else { st = 'ok'; txt = 'Сохранено' + (lastSync ? ' ' + fmtTime.format(lastSync) : ''); }
+    else if (loading) { st = 'busy'; txt = tr('Загружаю…'); }
+    else { st = 'ok'; txt = tr('Сохранено') + (lastSync ? ' ' + fmtTime.format(lastSync) : ''); }
     s.dataset.s = st; s.textContent = txt;
-    s.title = n ? 'Нажмите, чтобы сохранить сейчас' : (lastSubject ? 'Последний коммит: ' + lastSubject : 'Всё сохранено');
+    s.title = n ? tr('Нажмите, чтобы сохранить сейчас') : (lastSubject && mode === 'github' ? tr('Последний коммит: {s}', { s: lastSubject }) : tr('Всё сохранено'));
   }
 
   /* ---------- задачи ---------- */
@@ -808,7 +1454,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   function colById(id) { var c = columns(); for (var i = 0; i < c.length; i++) if (c[i].id === id) return c[i]; return null; }
   function colOf(t) { return colById(t.status) || columns()[0]; }
   function isDone(t) { return !!colOf(t).done; }
-  function areaName(id) { for (var i = 0; i < AREAS.length; i++) if (AREAS[i].id === id) return AREAS[i].name; return ''; }
+  function areaRaw(id) { for (var i = 0; i < AREAS.length; i++) if (AREAS[i].id === id) return AREAS[i].name; return ''; }
+  function areaName(id) { for (var i = 0; i < AREAS.length; i++) if (AREAS[i].id === id) return tr(AREAS[i].name); return ''; }
   function buildIndex() {
     index = {};
     Object.keys(files).forEach(function (p) {
@@ -844,7 +1491,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var ps = [];
     if (has('priority')) ps.push((prev.priority ? 'P' + prev.priority : 'без приоритета') + ' → ' + (t.priority ? 'P' + t.priority : 'без приоритета'));
     if (has('estimate')) ps.push('оценка ' + (t.estimate ? t.estimate + ' мин' : 'снята'));
-    if (has('area')) ps.push('область ' + (areaName(t.area) || 'снята'));
+    if (has('area')) ps.push('область ' + (areaRaw(t.area) || 'снята'));
     if (has('pinned')) ps.push(t.pinned ? 'закреплена' : 'откреплена');
     if (has('wip')) ps.push(t.wip ? 'в процессе' : 'не в процессе');
     if (has('due') || has('dueEnd')) ps.push(t.due ? 'срок ' + dueText(t) : 'срок снят');
@@ -920,8 +1567,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     root.className = 'split';
     root.dataset.tab = mtab; root.dataset.layout = settings.layout;
     var boardEl = renderBoard(weeks);
-    root.appendChild(el('section', { class: 'pane pane-cal', 'aria-label': 'Календарь' }, renderCal()));
-    root.appendChild(el('section', { class: 'pane pane-board', 'aria-label': 'Канбан' }, boardEl));
+    root.appendChild(el('section', { class: 'pane pane-cal', 'aria-label': tr('Календарь') }, renderCal()));
+    root.appendChild(el('section', { class: 'pane pane-board', 'aria-label': tr('Канбан') }, boardEl));
     var b = root.querySelector('.board'); if (b) b.scrollLeft = keepLeft;
     var sc = root.querySelector('.tg');
     if (sc) { sc.scrollTop = gridScroll; sc.addEventListener('scroll', function () { gridScroll = sc.scrollTop; }); }
@@ -1199,7 +1846,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     (function paint() {
       box.textContent = '';
       COLORS.forEach(function (c) {
-        var on = cur.indexOf(c.id) >= 0, b = el('button', { type: 'button', class: 'sw' + (on ? ' on' : ''), title: c.name, 'aria-label': c.name, 'aria-pressed': String(on) });
+        var on = cur.indexOf(c.id) >= 0, b = el('button', { type: 'button', class: 'sw' + (on ? ' on' : ''), title: tr(c.name), 'aria-label': tr(c.name), 'aria-pressed': String(on) });
         b.style.setProperty('--c', c.hex);
         b.addEventListener('click', function () { cur = single ? (on ? [] : [c.id]) : toggled(cur, c.id); onSet(cur); paint(); });
         box.appendChild(b);
@@ -1235,7 +1882,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   }
   var STATE_TITLE = { todo: 'Не начато', wip: 'В процессе', done: 'Выполнено' };
   function stBtn(t) {
-    var st = stateOf(t), b = el('span', { class: 'st ' + st, role: 'button', title: STATE_TITLE[st] + ' (нажмите, чтобы сменить)' });
+    var st = stateOf(t), b = el('span', { class: 'st ' + st, role: 'button', title: tr(STATE_TITLE[st]) + tr(' (нажмите, чтобы сменить)') });
     b.addEventListener('click', function (e) { e.stopPropagation(); setState(t.id, st === 'todo' ? 'wip' : st === 'wip' ? 'done' : 'todo'); });
     return b;
   }
@@ -1279,22 +1926,22 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       var t = draftOf(id); if (!t) { closeCtx(); return; }
       menu.textContent = '';
       var st = stateOf(t);
-      var top = el('div', { class: 'ctx-row' }, item('Открыть', function () { closeCtx(); openTask(id); }));
+      var top = el('div', { class: 'ctx-row' }, item(tr('Открыть'), function () { closeCtx(); openTask(id); }));
       if (t.date) {
-        var off = el('button', { type: 'button', class: 'ctx-ico', title: 'Убрать из календаря (останется в канбане)', 'aria-label': 'Убрать из календаря' });
+        var off = el('button', { type: 'button', class: 'ctx-ico', title: tr('Убрать из календаря (останется в канбане)'), 'aria-label': tr('Убрать из календаря') });
         off.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 6.5h12M5.5 1.8v2.4M10.5 1.8v2.4M6 10h4"/></svg>';
         off.addEventListener('click', function () { var d = draftOf(id); closeCtx(); if (d) { d.date = null; d.start = null; d.end = null; commitTask(d); } });
         top.appendChild(off);
       }
       menu.appendChild(top);
-      menu.appendChild(item(st === 'wip' ? 'Снять «в процессе»' : 'В процессе', function () { setState(id, st === 'wip' ? 'todo' : 'wip'); build(); }, '', el('span', { class: 'st wip' })));
-      menu.appendChild(item(st === 'done' ? 'Вернуть в работу' : 'Выполнено', function () { setState(id, st === 'done' ? 'todo' : 'done'); build(); }, '', el('span', { class: 'st done' })));
+      menu.appendChild(item(st === 'wip' ? tr('Снять «в процессе»') : tr('В процессе'), function () { setState(id, st === 'wip' ? 'todo' : 'wip'); build(); }, '', el('span', { class: 'st wip' })));
+      menu.appendChild(item(st === 'done' ? tr('Вернуть в работу') : tr('Выполнено'), function () { setState(id, st === 'done' ? 'todo' : 'done'); build(); }, '', el('span', { class: 'st done' })));
       menu.appendChild(el('hr'));
-      var ds = sec('Дата');
-      var wr = weekRange(), dp = [{ label: 'Сегодня', v: dayPlus(0) }, { label: 'Завтра', v: dayPlus(1) }, { label: 'На неделе', v: wr[0], end: wr[1] }];
+      var ds = sec(tr('Дата'));
+      var wr = weekRange(), dp = [{ label: tr('Сегодня'), v: dayPlus(0) }, { label: tr('Завтра'), v: dayPlus(1) }, { label: tr('На неделе'), v: wr[0], end: wr[1] }];
       for (var k = 2; k <= 7; k++) dp.push({ label: '+' + k, v: dayPlus(k) });
-      dp.push({ label: 'Без даты', v: null });
-      dp.forEach(function (p) { p.title = p.v ? (p.end ? fmtShort.formatRange(parse(p.v), parse(p.end)) : fmtShort.format(parse(p.v))) : 'убрать дату с карточки'; });
+      dp.push({ label: tr('Без даты'), v: null });
+      dp.forEach(function (p) { p.title = p.v ? (p.end ? fmtShort.formatRange(parse(p.v), parse(p.end)) : fmtShort.format(parse(p.v))) : tr('убрать дату с карточки'); });
       pills(ds, dp,
         function (p) { return p.v ? (t.due === p.v && (t.dueEnd || null) === (p.end || null)) : !t.due; },
         function (p) {
@@ -1303,22 +1950,22 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
             if (!p.v || on) { delete d.due; delete d.dueEnd; } else { d.due = p.v; if (p.end) d.dueEnd = p.end; else delete d.dueEnd; }
           });
         });
-      sec('Цвет карточки').appendChild(colorPicker(t.color ? [t.color] : [], function (v) { change(function (d) { if (v[0]) d.color = v[0]; else delete d.color; }); }, true));
-      sec('Метки').appendChild(colorPicker(t.colors || [], function (v) { change(function (d) { if (v.length) d.colors = v; else delete d.colors; }); }));
-      var is = sec('Значки'); is.appendChild(iconPicker(t.icons || [], function (v) { change(function (d) { if (v.length) d.icons = v; else delete d.icons; }); }));
-      var ps = sec('Приоритет');
-      pills(ps, [1, 2, 3, 4].map(function (n) { return { label: 'P' + n, v: n }; }).concat([{ label: 'Нет', v: null }]),
+      sec(tr('Цвет карточки')).appendChild(colorPicker(t.color ? [t.color] : [], function (v) { change(function (d) { if (v[0]) d.color = v[0]; else delete d.color; }); }, true));
+      sec(tr('Метки')).appendChild(colorPicker(t.colors || [], function (v) { change(function (d) { if (v.length) d.colors = v; else delete d.colors; }); }));
+      var is = sec(tr('Значки')); is.appendChild(iconPicker(t.icons || [], function (v) { change(function (d) { if (v.length) d.icons = v; else delete d.icons; }); }));
+      var ps = sec(tr('Приоритет'));
+      pills(ps, [1, 2, 3, 4].map(function (n) { return { label: 'P' + n, v: n }; }).concat([{ label: tr('Нет'), v: null }]),
         function (p) { return (t.priority || null) === p.v; }, function (p) { change(function (d) { d.priority = p.v; }); });
-      var cl = sec('Колонка');
+      var cl = sec(tr('Колонка'));
       pills(cl, columns().map(function (c) { return { label: c.title, v: c.id }; }),
         function (p) { return colOf(t).id === p.v; }, function (p) { change(function (d) { d.status = p.v; if (colById(p.v).done) delete d.wip; }); });
       menu.appendChild(el('hr'));
-      menu.appendChild(item(t.pinned ? 'Открепить от разбора' : 'Не двигать при разборе', function () { change(function (d) { if (d.pinned) delete d.pinned; else d.pinned = true; }); }));
-      menu.appendChild(item('Дублировать', function () {
-        var c = clone(t); c.id = uid(); c.title += ' (копия)'; c.created = new Date().toISOString(); c.order = (t.order || 0) + 1;
+      menu.appendChild(item(t.pinned ? tr('Открепить от разбора') : tr('Не двигать при разборе'), function () { change(function (d) { if (d.pinned) delete d.pinned; else d.pinned = true; }); }));
+      menu.appendChild(item(tr('Дублировать'), function () {
+        var c = clone(t); c.id = uid(); c.title += tr(' (копия)'); c.created = new Date().toISOString(); c.order = (t.order || 0) + 1;
         delete c.carriedFrom; delete c.aiNote; delete c.pinned; closeCtx(); commitTask(c);
       }));
-      menu.appendChild(item('Удалить', function (b) { arm(b, 'ctxdel', 'Точно удалить?', function () { closeCtx(); removeTask(id); }); }, 'danger'));
+      menu.appendChild(item(tr('Удалить'), function (b) { arm(b, 'ctxdel', tr('Точно удалить?'), function () { closeCtx(); removeTask(id); }); }, 'danger'));
     }
     build();
     document.body.appendChild(menu);
@@ -1338,11 +1985,11 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (!t.due) return null;
     var end = t.dueEnd || t.due, cls = 'due';
     if (!isDone(t)) { if (end < todayISO) cls += ' over'; else if (t.due <= todayISO) cls += ' today'; }
-    return el('span', { class: cls, title: 'Срок', text: dueText(t) });
+    return el('span', { class: cls, title: tr('Срок'), text: dueText(t) });
   }
   function slotBadge(t) {
     if (!t.date) return null;
-    return el('span', { class: 'slot', title: 'Стоит в календаре', text: '◷ ' + fmtShort.format(parse(t.date)) + (t.start != null ? ' ' + hhmm(t.start) + '–' + hhmm(endOf(t)) : '') });
+    return el('span', { class: 'slot', title: tr('Стоит в календаре'), text: '◷ ' + fmtShort.format(parse(t.date)) + (t.start != null ? ' ' + hhmm(t.start) + '–' + hhmm(endOf(t)) : '') });
   }
 
   /* ---------- доска ---------- */
@@ -1353,8 +2000,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     show.checked = !!ui.showRoutine;
     show.addEventListener('change', function () { ui.showRoutine = show.checked; lsSet(UI_KEY, ui); render(); });
     wrap.appendChild(el('div', { class: 'board-bar' },
-      el('span', { text: 'Inbox и ' + (wnums.length > 1 ? 'недели ' + wnums[0] + '–' + wnums[wnums.length - 1] : 'неделя ' + wnums[0]) }),
-      el('label', { for: 'show-routine' }, show, 'Показывать распорядок')));
+      el('span', { text: wnums.length > 1 ? tr('Inbox и недели {a}–{b}', { a: wnums[0], b: wnums[wnums.length - 1] }) : tr('Inbox и неделя {a}', { a: wnums[0] }) }),
+      el('label', { for: 'show-routine' }, show, tr('Показывать распорядок'))));
     var scope = {}; weeks.forEach(function (w) { scope[weekPath(w)] = 1; }); scope[P_INBOX] = 1;
     var tasks = Object.keys(index).map(function (k) { return index[k]; })
       .filter(function (e) { return scope[e.path] && (ui.showRoutine || e.t.kind !== 'routine'); })
@@ -1365,7 +2012,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       var inCol = tasks.filter(function (t) { return colOf(t).id === col.id; })
         .sort(function (a, b) { return (a.order || 0) - (b.order || 0) || (a.date || '').localeCompare(b.date || ''); });
       var shown = inCol.filter(matches);
-      var title = el('input', { class: 'col-title', id: 'col-' + col.id, value: col.title, 'aria-label': 'Название колонки' });
+      var title = el('input', { class: 'col-title', id: 'col-' + col.id, value: col.title, 'aria-label': tr('Название колонки') });
       title.addEventListener('change', function () {
         var v = title.value.trim(); if (!v) { title.value = col.title; return; }
         var id = col.id;
@@ -1373,10 +2020,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       });
       title.addEventListener('keydown', function (e) { if (e.key === 'Enter') title.blur(); });
       title.addEventListener('blur', function () { if (needRender) setTimeout(softRender, 0); });
-      var del = el('button', { class: 'icon-btn', title: 'Удалить колонку', 'aria-label': 'Удалить колонку', text: '×' });
+      var del = el('button', { class: 'icon-btn', title: tr('Удалить колонку'), 'aria-label': tr('Удалить колонку'), text: '×' });
       del.addEventListener('click', function () {
         if (cols.length < 2) return;
-        arm(del, 'col' + col.id, 'Удалить?', function () {
+        arm(del, 'col' + col.id, tr('Удалить?'), function () {
           var id = col.id, first = cols[ci === 0 ? 1 : 0].id;
           all().filter(function (t) { return t.status === id; }).forEach(function (t) { var d = clone(t); d.status = first; commitTask(d); });
           boardAction('удалена колонка «' + col.title + '»', { act: 'remove', id: id });
@@ -1395,16 +2042,16 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
         var d = draftOf(id); if (!d) return;
         d.status = col.id; d.order = order; commitTask(d);
       });
-      var addBtn = el('button', { class: 'add-card', text: '+ Добавить карточку' });
+      var addBtn = el('button', { class: 'add-card', text: tr('+ Добавить карточку') });
       addBtn.addEventListener('click', function () {
-        inlineInput(addBtn, 'Название задачи', function (v) { commitTask(newDraft({ title: v, status: col.id })); });
+        inlineInput(addBtn, tr('Название задачи'), function (v) { commitTask(newDraft({ title: v, status: col.id })); });
       });
       boardEl.appendChild(el('section', { class: 'col' },
         el('div', { class: 'col-head' }, title, el('span', { class: 'count', text: String(shown.length) }), del), list, addBtn));
     });
-    var ab = el('button', { class: 'add-card', text: '+ Колонка' });
+    var ab = el('button', { class: 'add-card', text: tr('+ Колонка') });
     ab.addEventListener('click', function () {
-      inlineInput(ab, 'Название колонки', function (v) {
+      inlineInput(ab, tr('Название колонки'), function (v) {
         var c = { id: 'c' + Date.now().toString(36), title: v };
         boardAction('новая колонка «' + v + '»', { act: 'add', col: c });
       });
@@ -1432,8 +2079,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (t.area) meta.appendChild(el('span', { class: 'lb', data: { a: t.area }, text: areaName(t.area) }));
     var d = dueBadge(t); if (d) meta.appendChild(d);
     var sl = slotBadge(t); if (sl) meta.appendChild(sl);
-    if (t.estimate && t.start == null) meta.appendChild(el('span', { class: 'est', text: '~' + t.estimate + ' мин' }));
-    if (t.carriedFrom && t.carriedFrom.length) meta.appendChild(el('span', { class: 'carried', title: 'Перенесена: ' + t.carriedFrom.join(', '), text: '↻' + t.carriedFrom.length }));
+    if (t.estimate && t.start == null) meta.appendChild(el('span', { class: 'est', text: '~' + t.estimate + tr(' мин') }));
+    if (t.carriedFrom && t.carriedFrom.length) meta.appendChild(el('span', { class: 'carried', title: tr('Перенесена: ') + t.carriedFrom.join(', '), text: '↻' + t.carriedFrom.length }));
     (t.icons || []).slice().reverse().forEach(function (ic) { meta.insertBefore(el('span', { class: 'ic-badge', text: ic }), meta.firstChild); });
     var lbls = null;
     if (t.colors && t.colors.length) {
@@ -1478,14 +2125,14 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var main = el('div', { class: 'cal-main' });
     var title = calMode === 'month' ? cap(fmtMonth.format(calDate)) : calMode === 'day' ? cap(fmtDay.format(calDate))
       : fmtShort.format(calDate) + ' – ' + fmtShort.format(addDays(calDate, 2));
-    var prev = el('button', { class: 'btn', 'aria-label': 'Назад', text: '←', on: { click: function () { shift(-1); } } });
-    var next = el('button', { class: 'btn', 'aria-label': 'Вперёд', text: '→', on: { click: function () { shift(1); } } });
-    var tod = el('button', { class: 'btn', text: 'Сегодня', on: { click: function () {
+    var prev = el('button', { class: 'btn', 'aria-label': tr('Назад'), text: '←', on: { click: function () { shift(-1); } } });
+    var next = el('button', { class: 'btn', 'aria-label': tr('Вперёд'), text: '→', on: { click: function () { shift(1); } } });
+    var tod = el('button', { class: 'btn', text: tr('Сегодня'), on: { click: function () {
       calDate = calMode === 'month' ? new Date(today.getFullYear(), today.getMonth(), 1) : new Date(today);
       gridScroll = Math.max(390, nowMin() - 120) * PPM; render();
     } } });
     var modes = el('div', { class: 'tabs modes' });
-    [['month', 'Месяц'], ['3d', '3 дня'], ['day', 'День']].forEach(function (m) {
+    [['month', tr('Месяц')], ['3d', tr('3 дня')], ['day', tr('День')]].forEach(function (m) {
       var b = el('button', { class: 'tab', text: m[1], on: { click: function () { setMode(m[0]); } } });
       b.setAttribute('aria-pressed', String(calMode === m[0]));
       modes.appendChild(b);
@@ -1498,8 +2145,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var undated = all().filter(function (t) { return !t.date && matches(t); })
       .sort(function (a, b) { return (a.priority || 9) - (b.priority || 9) || (a.order || 0) - (b.order || 0); });
     var inbox = el('aside', { class: 'inbox' },
-      el('h3', { text: 'Inbox, без даты' }, el('span', { class: 'count', text: String(undated.length) })),
-      undated.length ? null : el('p', { text: 'Пусто. Новые задачи без даты попадают сюда, Claude распределяет их при разборе.' }));
+      el('h3', { text: tr('Inbox, без даты') }, el('span', { class: 'count', text: String(undated.length) })),
+      undated.length ? null : el('p', { text: tr('Пусто. Новые задачи без даты попадают сюда, Claude распределяет их при разборе.') }));
     var list = el('div', { class: 'inbox-list' });
     undated.forEach(function (t) { list.appendChild(chipNode(t)); });
     inbox.appendChild(list);
@@ -1518,18 +2165,18 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     all().forEach(function (t) { if (t.date && matches(t) && (ui.showRoutine || t.kind !== 'routine')) (byDate[t.date] = byDate[t.date] || []).push(t); });
     for (var i = 0; i < rows * 7; i++) (function (date) {
       var key = iso(date);
-      var add = el('button', { class: 'add-day', title: 'Добавить задачу', 'aria-label': 'Добавить задачу на ' + key, text: '+',
+      var add = el('button', { class: 'add-day', title: tr('Добавить задачу'), 'aria-label': tr('Добавить задачу на ') + key, text: '+',
         on: { click: function () { openNew({ date: key }); } } });
       var cell = el('div', { class: 'day' + (date.getMonth() !== cm.getMonth() ? ' out' : '') + (key === todayISO ? ' today' : '') },
         el('div', { class: 'day-top' }, el('span', { class: 'num', text: String(date.getDate()) }), add));
       var items = (byDate[key] || []).sort(function (a, b) { return (a.start == null ? -1 : a.start) - (b.start == null ? -1 : b.start); });
       items.slice(0, 3).forEach(function (t) { cell.appendChild(chipNode(t)); });
-      if (items.length > 3) cell.appendChild(el('button', { class: 'more add-card', text: 'ещё ' + (items.length - 3),
+      if (items.length > 3) cell.appendChild(el('button', { class: 'more add-card', text: tr('ещё {n}', { n: items.length - 3 }),
         on: { click: function () { calDate = date; setMode('day'); } } }));
       setDrop(cell, function (id) { var d = draftOf(id); if (!d) return; d.date = key; commitTask(d); });
       grid.appendChild(cell);
     })(addDays(start, i));
-    var hint = el('p', { class: 'hint', text: ui.showRoutine ? '' : 'Распорядок скрыт в месяце. Включите «Показывать распорядок» над доской.' });
+    var hint = el('p', { class: 'hint', text: ui.showRoutine ? '' : tr('Распорядок скрыт в месяце. Включите «Показывать распорядок» над доской.') });
     return el('div', { class: 'cal-scroll' }, grid, ui.showRoutine ? null : el('div', { style: 'padding:8px' }, hint));
   }
 
@@ -1631,8 +2278,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (t.desc) node.appendChild(el('div', { class: 'ev-desc', text: t.desc }));
     var meta = el('div', { class: 'ev-meta' });
     if (t.area) meta.appendChild(el('span', { class: 'lb', data: { a: t.area }, text: areaName(t.area) }));
-    if (t.estimate) meta.appendChild(el('span', { class: 'est', text: '~' + t.estimate + ' мин' }));
-    if (t.carriedFrom && t.carriedFrom.length) meta.appendChild(el('span', { class: 'carried', title: 'Перенесена: ' + t.carriedFrom.join(', '), text: '↻' + t.carriedFrom.length }));
+    if (t.estimate) meta.appendChild(el('span', { class: 'est', text: '~' + t.estimate + tr(' мин') }));
+    if (t.carriedFrom && t.carriedFrom.length) meta.appendChild(el('span', { class: 'carried', title: tr('Перенесена: ') + t.carriedFrom.join(', '), text: '↻' + t.carriedFrom.length }));
     if (meta.childNodes.length) node.appendChild(meta);
     paintEv(node, t.start, endOf(t));
     off = off || 0; span = span || 1;
@@ -1651,7 +2298,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     return node;
   }
   function inlineCreate(ghost, key, a, b) {
-    var inp = el('input', { class: 'ev-input', placeholder: 'Название', 'aria-label': 'Название задачи', maxlength: '200' });
+    var inp = el('input', { class: 'ev-input', placeholder: tr('Название'), 'aria-label': tr('Название задачи'), maxlength: '200' });
     ghost.classList.add('editing'); ghost.appendChild(inp);
     var done = false;
     function finish(commit) {
@@ -1681,12 +2328,12 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
         el('span', { class: 'dw', text: cap(fmtDow.format(d)) }), el('span', { class: 'dn', text: String(d.getDate()) })));
     });
     top.appendChild(head);
-    var ad = el('div', { class: 'tg-row tg-allday', style: 'grid-template-columns:' + tpl }, el('div', { class: 'tg-adl', text: 'весь день' }));
+    var ad = el('div', { class: 'tg-row tg-allday', style: 'grid-template-columns:' + tpl }, el('div', { class: 'tg-adl', text: tr('весь день') }));
     var items = all().filter(matches);
     keys.forEach(function (key) {
       var cell = el('div', { class: 'tg-ad' });
       items.filter(function (t) { return t.date === key && t.start == null; }).forEach(function (t) { cell.appendChild(chipNode(t)); });
-      cell.appendChild(el('button', { class: 'add-day', title: 'Задача на весь день', 'aria-label': 'Добавить задачу на ' + key, text: '+',
+      cell.appendChild(el('button', { class: 'add-day', title: tr('Задача на весь день'), 'aria-label': tr('Добавить задачу на ') + key, text: '+',
         on: { click: function () { openNew({ date: key }); } } }));
       setDrop(cell, function (id) { var d = draftOf(id); if (!d) return; d.date = key; d.start = null; d.end = null; commitTask(d); });
       ad.appendChild(cell);
@@ -1782,8 +2429,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   function openTask(id) { var d = draftOf(id); if (d) taskModal(d, false); }
   function openNew(extra) { taskModal(newDraft(extra || {}), true); }
   function taskModal(task, isNew) {
-    var title = el('input', { id: 'f-title', type: 'text', value: task.title, placeholder: 'Что нужно сделать' });
-    var desc = el('textarea', { id: 'f-desc', placeholder: 'Описание: чем подробнее, тем точнее Claude оценит срок' }); desc.value = task.desc || '';
+    var title = el('input', { id: 'f-title', type: 'text', value: task.title, placeholder: tr('Что нужно сделать') });
+    var desc = el('textarea', { id: 'f-desc', placeholder: tr('Описание: чем подробнее, тем точнее Claude оценит срок') }); desc.value = task.desc || '';
     function grow() { desc.style.height = 'auto'; desc.style.height = desc.scrollHeight + 2 + 'px'; }
     desc.addEventListener('input', grow);
     var status = el('select', { id: 'f-col' });
@@ -1791,20 +2438,20 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var date = el('input', { id: 'f-date', type: 'date', value: task.date || '' });
     var startI = el('input', { id: 'f-start', type: 'time', value: task.start != null ? hhmm(task.start) : '' });
     var endI = el('input', { id: 'f-end', type: 'time', value: task.start != null ? hhmm(endOf(task)) : '' });
-    var area = el('select', { id: 'f-area' }, el('option', { value: '', text: 'Без области' }));
-    AREAS.forEach(function (a) { var o = el('option', { value: a.id, text: a.name }); if (a.id === task.area) o.selected = true; area.appendChild(o); });
+    var area = el('select', { id: 'f-area' }, el('option', { value: '', text: tr('Без области') }));
+    AREAS.forEach(function (a) { var o = el('option', { value: a.id, text: tr(a.name) }); if (a.id === task.area) o.selected = true; area.appendChild(o); });
     var pr = el('select', { id: 'f-pr' });
-    [['', 'Не задан'], ['1', 'P1 срочно и важно'], ['2', 'P2 важно'], ['3', 'P3 обычное'], ['4', 'P4 когда-нибудь']].forEach(function (p) {
+    [['', tr('Не задан')], ['1', tr('P1 срочно и важно')], ['2', tr('P2 важно')], ['3', tr('P3 обычное')], ['4', tr('P4 когда-нибудь')]].forEach(function (p) {
       var o = el('option', { value: p[0], text: p[1] }); if (String(task.priority || '') === p[0]) o.selected = true; pr.appendChild(o);
     });
-    var est = el('input', { id: 'f-est', type: 'number', min: '5', step: '5', value: task.estimate || '', placeholder: 'мин' });
+    var est = el('input', { id: 'f-est', type: 'number', min: '5', step: '5', value: task.estimate || '', placeholder: tr('мин') });
     var pin = el('input', { id: 'f-pin', type: 'checkbox' }); pin.checked = !!task.pinned;
     var due = el('input', { id: 'f-due', type: 'date', value: task.due || '' }), dueE = el('input', { id: 'f-due2', type: 'date', value: task.dueEnd || '' });
     var cols = (task.colors || []).slice(), icos = (task.icons || []).slice(), cc = task.color || null;
     var err = el('div', { class: 'err', hidden: true });
     function commit() {
       var v = title.value.trim();
-      if (!v) { err.hidden = false; err.textContent = 'Введите название задачи.'; title.focus(); return; }
+      if (!v) { err.hidden = false; err.textContent = tr('Введите название задачи.'); title.focus(); return; }
       task.title = v; task.desc = desc.value.trim() || null; task.status = status.value; task.date = date.value || null;
       task.area = area.value || null; task.priority = pr.value ? +pr.value : null;
       if (cols.length) task.colors = cols; else delete task.colors;
@@ -1820,59 +2467,59 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
         if (s == null) s = Math.max(0, en - (task.estimate || 60));
         if (en == null) en = Math.min(1440, s + (task.estimate || 60));
         if (en === 0 && s > 0) en = 1440;
-        if (en <= s) { err.hidden = false; err.textContent = 'Конец должен быть позже начала.'; return; }
+        if (en <= s) { err.hidden = false; err.textContent = tr('Конец должен быть позже начала.'); return; }
         task.start = s; task.end = en;
       }
       commitTask(task); closeModal();
     }
     title.addEventListener('keydown', function (e) { if (e.key === 'Enter') commit(); });
     var actions = el('div', { class: 'actions' },
-      el('button', { class: 'btn primary', text: isNew ? 'Создать' : 'Сохранить', on: { click: commit } }),
-      el('button', { class: 'btn', text: 'Отмена', on: { click: closeModal } }), el('span', { class: 'spacer' }));
+      el('button', { class: 'btn primary', text: isNew ? tr('Создать') : tr('Сохранить'), on: { click: commit } }),
+      el('button', { class: 'btn', text: tr('Отмена'), on: { click: closeModal } }), el('span', { class: 'spacer' }));
     if (!isNew) {
-      var del = el('button', { class: 'btn danger', text: 'Удалить' });
-      del.addEventListener('click', function () { arm(del, 'task', 'Точно удалить?', function () { removeTask(task.id); closeModal(); }); });
+      var del = el('button', { class: 'btn danger', text: tr('Удалить') });
+      del.addEventListener('click', function () { arm(del, 'task', tr('Точно удалить?'), function () { removeTask(task.id); closeModal(); }); });
       actions.appendChild(del);
     }
-    showModal(isNew ? 'Новая задача' : 'Задача', [
-      el('h2', { text: isNew ? 'Новая задача' : (task.kind === 'routine' ? 'Распорядок' : 'Задача') }),
-      field('Название', 'f-title', title), field('Описание', 'f-desc', desc),
-      el('div', { class: 'row2' }, field('Колонка', 'f-col', status), field('Дата', 'f-date', date)),
-      el('div', { class: 'row2' }, field('Начало', 'f-start', startI), field('Конец', 'f-end', endI)),
-      el('div', { class: 'row2' }, field('Приоритет', 'f-pr', pr), field('Оценка, мин', 'f-est', est)),
-      el('div', { class: 'row2' }, field('Область', 'f-area', area),
-        el('div', { class: 'field' }, el('span', { class: 'flabel', text: 'Для Claude' }), el('label', { class: 'check', for: 'f-pin' }, pin, 'Не двигать при разборе'))),
-      el('div', { class: 'row2' }, field('Срок на карточке (только надпись)', 'f-due', due), field('Срок до (для диапазона)', 'f-due2', dueE)),
-      el('div', { class: 'field' }, el('span', { class: 'flabel', text: 'Цвет карточки' }), colorPicker(cc ? [cc] : [], function (v) { cc = v[0] || null; }, true)),
-      el('div', { class: 'field' }, el('span', { class: 'flabel', text: 'Метки' }), colorPicker(cols, function (v) { cols = v; })),
-      el('div', { class: 'field' }, el('span', { class: 'flabel', text: 'Значки' }), iconPicker(icos, function (v) { icos = v; })),
-      task.aiNote ? el('div', { class: 'ainote' }, el('b', { text: 'Комментарий Claude: ' }), task.aiNote) : null,
-      task.carriedFrom && task.carriedFrom.length ? el('p', { class: 'hint', text: 'Переносилась с недель: ' + task.carriedFrom.join(', ') }) : null,
-      el('p', { class: 'hint', text: 'Без даты задача лежит в Inbox. С датой и временем стоит в сетке дня.' }),
+    showModal(isNew ? tr('Новая задача') : tr('Задача'), [
+      el('h2', { text: isNew ? tr('Новая задача') : (task.kind === 'routine' ? tr('Распорядок') : tr('Задача')) }),
+      field(tr('Название'), 'f-title', title), field(tr('Описание'), 'f-desc', desc),
+      el('div', { class: 'row2' }, field(tr('Колонка'), 'f-col', status), field(tr('Дата'), 'f-date', date)),
+      el('div', { class: 'row2' }, field(tr('Начало'), 'f-start', startI), field(tr('Конец'), 'f-end', endI)),
+      el('div', { class: 'row2' }, field(tr('Приоритет'), 'f-pr', pr), field(tr('Оценка, мин'), 'f-est', est)),
+      el('div', { class: 'row2' }, field(tr('Область'), 'f-area', area),
+        el('div', { class: 'field' }, el('span', { class: 'flabel', text: tr('Для Claude') }), el('label', { class: 'check', for: 'f-pin' }, pin, tr('Не двигать при разборе')))),
+      el('div', { class: 'row2' }, field(tr('Срок на карточке (только надпись)'), 'f-due', due), field(tr('Срок до (для диапазона)'), 'f-due2', dueE)),
+      el('div', { class: 'field' }, el('span', { class: 'flabel', text: tr('Цвет карточки') }), colorPicker(cc ? [cc] : [], function (v) { cc = v[0] || null; }, true)),
+      el('div', { class: 'field' }, el('span', { class: 'flabel', text: tr('Метки') }), colorPicker(cols, function (v) { cols = v; })),
+      el('div', { class: 'field' }, el('span', { class: 'flabel', text: tr('Значки') }), iconPicker(icos, function (v) { icos = v; })),
+      task.aiNote ? el('div', { class: 'ainote' }, el('b', { text: tr('Комментарий Claude: ') }), task.aiNote) : null,
+      task.carriedFrom && task.carriedFrom.length ? el('p', { class: 'hint', text: tr('Переносилась с недель: ') + task.carriedFrom.join(', ') }) : null,
+      el('p', { class: 'hint', text: tr('Без даты задача лежит в Inbox. С датой и временем стоит в сетке дня.') }),
       err, actions], title);
     grow();
   }
   function claudeModal() {
     var f = ensureFile(P_REPORT);
-    var repo = demo ? 'githubtrashstuff/TOTALTASK' : cfg.owner + '/' + cfg.repo;
+    var repo = cfg.owner + '/' + cfg.repo;
     var cmd = 'АНАЛИЗ: разбери задачи в репозитории ' + repo + ' по разделу «Разбор» из CLAUDE.md и запушь результат.';
-    var copyBtn = el('button', { class: 'btn primary', text: 'Скопировать команду' });
+    var copyBtn = el('button', { class: 'btn primary', text: tr('Скопировать команду') });
     var cmdBox = el('div', { class: 'cmd', text: cmd });
     copyBtn.addEventListener('click', function () {
-      var ok = function () { copyBtn.textContent = 'Скопировано'; setTimeout(function () { copyBtn.textContent = 'Скопировать команду'; }, 2000); };
+      var ok = function () { copyBtn.textContent = tr('Скопировано'); setTimeout(function () { copyBtn.textContent = tr('Скопировать команду'); }, 2000); };
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(cmd).then(ok, select); else select();
-      function select() { var r = document.createRange(); r.selectNodeContents(cmdBox); var s = getSelection(); s.removeAllRanges(); s.addRange(r); copyBtn.textContent = 'Нажмите Ctrl+C'; }
+      function select() { var r = document.createRange(); r.selectNodeContents(cmdBox); var s = getSelection(); s.removeAllRanges(); s.addRange(r); copyBtn.textContent = tr('Нажмите Ctrl+C'); }
     });
-    showModal('Анализ', [
-      el('h2', { text: 'Анализ задач' }),
-      el('p', { class: 'hint', text: 'Claude перенесёт невыполненное, разберёт Inbox, расставит приоритеты, сроки и время. 1. Скопируйте команду. 2. Откройте Claude Code и отправьте её. 3. Когда Claude закончит, обновления появятся здесь в течение минуты.' }),
+    showModal(tr('Анализ'), [
+      el('h2', { text: tr('Анализ задач') }),
+      el('p', { class: 'hint', text: tr('Claude перенесёт невыполненное, разберёт Inbox, расставит приоритеты, сроки и время. 1. Скопируйте команду. 2. Откройте Claude Code и отправьте её. 3. Когда Claude закончит, обновления появятся здесь в течение минуты.') }),
       cmdBox,
-      el('div', { class: 'actions' }, copyBtn, el('a', { class: 'btn', href: 'https://claude.ai/code', target: '_blank', rel: 'noopener', text: 'Открыть Claude Code ↗' })),
-      el('div', { class: 'flabel', text: 'Отчёт последнего разбора' }),
-      el('div', { class: 'report', text: (f.state === 'loading' ? 'Загружаю…' : (f.data || 'Отчёта пока нет.')) }),
-      el('div', { class: 'actions' }, el('span', { class: 'spacer' }), el('button', { class: 'btn', text: 'Закрыть', on: { click: closeModal } }))
+      el('div', { class: 'actions' }, copyBtn, el('a', { class: 'btn', href: 'https://claude.ai/code', target: '_blank', rel: 'noopener', text: tr('Открыть Claude Code ↗') })),
+      el('div', { class: 'flabel', text: tr('Отчёт последнего разбора') }),
+      el('div', { class: 'report', text: (f.state === 'loading' ? tr('Загружаю…') : (f.data || tr('Отчёта пока нет.'))) }),
+      el('div', { class: 'actions' }, el('span', { class: 'spacer' }), el('button', { class: 'btn', text: tr('Закрыть'), on: { click: closeModal } }))
     ]);
-    if (f.state === 'ready' && !demo) loadFile(P_REPORT).then(function () { var r = document.querySelector('.report'); if (r) r.textContent = files[P_REPORT].data || 'Отчёта пока нет.'; });
+    if (f.state === 'ready') loadFile(P_REPORT).then(function () { var r = document.querySelector('.report'); if (r) r.textContent = files[P_REPORT].data || tr('Отчёта пока нет.'); });
   }
   function pxCtl(id, key, min, max) {
     var r = el('input', { id: id, type: 'range', min: String(min), max: String(max), step: '1', value: String(settings[key]) });
@@ -1882,8 +2529,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   }
   function msCtl(id, key, max, step, after) {
     var r = el('input', { id: id, type: 'range', min: '0', max: String(max), step: String(step), value: String(settings[key]) });
-    var out = el('span', { class: 'hint', text: (settings[key] / 1000).toFixed(2).replace(/0$/, '') + ' с' });
-    r.addEventListener('input', function () { settings[key] = +r.value; out.textContent = (settings[key] / 1000).toFixed(2).replace(/0$/, '') + ' с'; saveSettings(); if (after) after(); });
+    var out = el('span', { class: 'hint', text: (settings[key] / 1000).toFixed(2).replace(/0$/, '') + tr(' с') });
+    r.addEventListener('input', function () { settings[key] = +r.value; out.textContent = (settings[key] / 1000).toFixed(2).replace(/0$/, '') + tr(' с'); saveSettings(); if (after) after(); });
     return el('div', { style: 'display:flex;align-items:center;gap:8px' }, r, out);
   }
   function settingsModal() {
@@ -1901,52 +2548,61 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     function row(label, id, control, hint) {
       return el('div', { class: 'setting' }, el('label', { for: id, text: label }), control, hint ? el('p', { class: 'hint', text: hint }) : null);
     }
-    var info = demo ? 'Сейчас открыто демо: «сохранения» идут в память страницы, не в GitHub.' : 'Подключено: ' + cfg.owner + '/' + cfg.repo + ', ветка ' + cfg.branch + '.';
+    var info = mode === 'local' ? tr('Данные хранятся только в этом браузере, без аккаунта и без сети.') : tr('Подключено: {repo}, ветка {branch}.', { repo: cfg.owner + '/' + cfg.repo, branch: cfg.branch });
     var device = el('input', { id: 's-device', type: 'text', value: settings.device || '' });
     device.addEventListener('change', function () { settings.device = device.value.trim() || DEFAULT_SETTINGS.device; saveSettings(); });
-    var saveNow = el('button', { class: 'btn primary', text: 'Сохранить сейчас', disabled: !actions.length });
-    saveNow.addEventListener('click', function () { closeModal(); flush('manual'); });
-    var out = el('button', { class: 'btn danger', text: demo ? 'Выйти из демо' : 'Отключить это устройство' });
+    var saveNow = mode === 'local' ? null : el('button', { class: 'btn primary', text: tr('Сохранить сейчас'), disabled: !actions.length });
+    if (saveNow) saveNow.addEventListener('click', function () { closeModal(); flush('manual'); });
+    var out = el('button', { class: 'btn danger', text: mode === 'local' ? tr('Сменить способ хранения') : tr('Отключить это устройство') });
     out.addEventListener('click', function () {
-      arm(out, 'logout', demo ? 'Выйти?' : 'Токен и несохранённое удалятся. Точно?', function () {
-        if (!demo) { lsSet('tt-pending-v1:' + repoKey(), null); Object.keys(files).forEach(function (p) { lsSet(cacheKey(p), null); }); }
+      arm(out, 'logout', mode === 'local' ? tr('Вернуться к выбору? Данные останутся в этом браузере.') : tr('Токен и несохранённое удалятся. Точно?'), function () {
+        if (mode === 'github') { lsSet('tt-pending-v1:' + repoKey(), null); Object.keys(files).forEach(function (p) { lsSet(cacheKey(p), null); }); }
         lsSet(CFG_KEY, null); location.reload();
       });
     });
+    var exportBtn = mode === 'local' ? el('button', { class: 'btn', text: tr('Скачать резервную копию'), on: { click: function () {
+      var blob = new Blob([JSON.stringify(backend.exportAll(), null, 2)], { type: 'application/json' }), a = el('a', { href: URL.createObjectURL(blob), download: 'totaltask-backup-' + todayISO + '.json' });
+      document.body.appendChild(a); a.click(); a.remove();
+    } } }) : null;
     var n = actions.length;
-    showModal('Настройки', [
-      el('h2', { text: 'Настройки' }), el('p', { class: 'hint', text: info }),
-      el('p', { class: 'hint', text: n ? 'Не сохранено: ' + plural(n, 'действие', 'действия', 'действий') + '. Они хранятся в этом браузере и не пропадут при закрытии вкладки.'
-        : 'Всё сохранено.' + (lastSubject ? ' Последний коммит: ' + lastSubject : '') }),
-      row('Колесо мыши в календаре', 's-wheel', sel('s-wheel', settings.wheelZoom ? '1' : '0', [['1', 'Масштаб времени (Alt — прокрутка)'], ['0', 'Прокрутка (Ctrl — масштаб)']],
-        function (v) { settings.wheelZoom = v === '1'; }), 'Масштаб растягивает сетку дня по вертикали вокруг курсора.'),
-      row('Календарь', 's-layout', sel('s-layout', settings.layout, [['left', 'Слева, канбан справа'], ['right', 'Справа, канбан слева']],
-        function (v) { settings.layout = v; $('view').dataset.layout = v; }), 'Расположение двух частей на широком экране.'),
-      row('Скольжение между днями', 's-slide', msCtl('s-slide', 'slide', 2000, 100),
-        'Как долго карточка плывёт в соседний день, когда вы тянете её в календаре. 0 — мгновенно.'),
-      row('Зона растягивания по краям блока', 's-grip', pxCtl('s-grip', 'grip', 1, 12),
-        'Сколько пикселей у верхнего и нижнего края блока в календаре занимает растягивание. Остальное: перенос.'),
-      row('Контур при наведении', 's-hover', msCtl('s-hover', 'hover', 1000, 50, function () { document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms'); }),
-        'Как быстро появляется и гаснет рамка вокруг карточки под курсором. 0 — мгновенно.'),
-      row('Сохранять после паузы', 's-idle', sel('s-idle', settings.idle,
-        [[15, '15 секунд'], [30, '30 секунд'], [60, '1 минута'], [120, '2 минуты'], [300, '5 минут'], [600, '10 минут'], [0, 'Не сохранять по паузе']],
+    showModal(tr('Настройки'), [
+      el('h2', { text: tr('Настройки') }), el('p', { class: 'hint', text: info }),
+      mode === 'local' ? null : el('p', { class: 'hint', text: n ? tr('Не сохранено: {what}. Они хранятся в этом браузере и не пропадут при закрытии вкладки.', { what: trn('{n} действие|{n} действия|{n} действий', n) })
+        : tr('Всё сохранено.') + (lastSubject ? ' ' + tr('Последний коммит: {s}', { s: lastSubject }) : '') }),
+      row(tr('Язык'), 's-lang', sel('s-lang', settings.lang, LANGS, function (v) {
+        settings.lang = v; saveSettings(); setLang(v);
+        if (files[P_BOARD] && !files[P_BOARD].sha) { files[P_BOARD].base = defaultBoard(); recompute(P_BOARD); }
+        closeModal(); render(); settingsModal();
+      })),
+      row(tr('Колесо мыши в календаре'), 's-wheel', sel('s-wheel', settings.wheelZoom ? '1' : '0', [['1', tr('Масштаб времени (Alt — прокрутка)')], ['0', tr('Прокрутка (Ctrl — масштаб)')]],
+        function (v) { settings.wheelZoom = v === '1'; }), tr('Масштаб растягивает сетку дня по вертикали вокруг курсора.')),
+      row(tr('Календарь'), 's-layout', sel('s-layout', settings.layout, [['left', tr('Слева, канбан справа')], ['right', tr('Справа, канбан слева')]],
+        function (v) { settings.layout = v; $('view').dataset.layout = v; }), tr('Расположение двух частей на широком экране.')),
+      row(tr('Скольжение между днями'), 's-slide', msCtl('s-slide', 'slide', 2000, 100),
+        tr('Как долго карточка плывёт в соседний день, когда вы тянете её в календаре. 0 — мгновенно.')),
+      row(tr('Зона растягивания по краям блока'), 's-grip', pxCtl('s-grip', 'grip', 1, 12),
+        tr('Сколько пикселей у верхнего и нижнего края блока в календаре занимает растягивание. Остальное: перенос.')),
+      row(tr('Контур при наведении'), 's-hover', msCtl('s-hover', 'hover', 1000, 50, function () { document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms'); }),
+        tr('Как быстро появляется и гаснет рамка вокруг карточки под курсором. 0 — мгновенно.')),
+      mode === 'local' ? null : row(tr('Сохранять после паузы'), 's-idle', sel('s-idle', settings.idle,
+        [[15, tr('15 секунд')], [30, tr('30 секунд')], [60, tr('1 минута')], [120, tr('2 минуты')], [300, tr('5 минут')], [600, tr('10 минут')], [0, tr('Не сохранять по паузе')]],
         function (v) { settings.idle = +v; scheduleFlush(); }),
-        'Пока вы двигаете, пишете или держите открытым окно задачи, ничего не отправляется. Отсчёт начинается с последнего действия.'),
-      row('Сохранять при уходе со вкладки', 's-hide', chk('s-hide', settings.onHide, function (v) { settings.onHide = v; }),
-        'Переключились на другую вкладку, свернули браузер или заблокировали телефон.'),
-      row('Сохранять при потере фокуса окна', 's-blur', chk('s-blur', settings.onBlur, function (v) { settings.onBlur = v; }),
-        'Переключились в другую программу, а вкладка осталась на экране.'),
-      row('Объединять коммиты', 's-squash', sel('s-squash', settings.squash,
-        [['off', 'Нет, каждое сохранение отдельно'], ['hour', 'За час'], ['day', 'За день']],
+        tr('Пока вы двигаете, пишете или держите открытым окно задачи, ничего не отправляется. Отсчёт начинается с последнего действия.')),
+      mode === 'local' ? null : row(tr('Сохранять при уходе со вкладки'), 's-hide', chk('s-hide', settings.onHide, function (v) { settings.onHide = v; }),
+        tr('Переключились на другую вкладку, свернули браузер или заблокировали телефон.')),
+      mode === 'local' ? null : row(tr('Сохранять при потере фокуса окна'), 's-blur', chk('s-blur', settings.onBlur, function (v) { settings.onBlur = v; }),
+        tr('Переключились в другую программу, а вкладка осталась на экране.')),
+      mode === 'local' ? null : row(tr('Объединять коммиты'), 's-squash', sel('s-squash', settings.squash,
+        [['off', tr('Нет, каждое сохранение отдельно')], ['hour', tr('За час')], ['day', tr('За день')]],
         function (v) { settings.squash = v; }),
-        'Новое сохранение заменяет предыдущий коммит сайта за этот час или день, если после него никто ничего не коммитил. История остаётся короткой, все действия перечислены в одном сообщении.'),
-      row('Проверять изменения', 's-poll', sel('s-poll', settings.poll,
-        [[30, 'Раз в 30 секунд'], [60, 'Раз в минуту'], [300, 'Раз в 5 минут']],
+        tr('Новое сохранение заменяет предыдущий коммит сайта за этот час или день, если после него никто ничего не коммитил. История остаётся короткой, все действия перечислены в одном сообщении.')),
+      mode === 'local' ? null : row(tr('Проверять изменения'), 's-poll', sel('s-poll', settings.poll,
+        [[30, tr('Раз в 30 секунд')], [60, tr('Раз в минуту')], [300, tr('Раз в 5 минут')]],
         function (v) { settings.poll = +v; schedulePoll(); }),
-        'Как часто подтягивать правки Claude и других устройств. Также проверяется при возврате на вкладку.'),
-      row('Имя устройства', 's-device', device, 'Пишется в коммит, чтобы было видно, откуда правка.'),
-      el('div', { class: 'actions' }, saveNow, el('span', { class: 'spacer' }), out,
-        el('button', { class: 'btn', text: 'Закрыть', on: { click: closeModal } }))
+        tr('Как часто подтягивать правки Claude и других устройств. Также проверяется при возврате на вкладку.')),
+      mode === 'local' ? null : row(tr('Имя устройства'), 's-device', device, tr('Пишется в коммит, чтобы было видно, откуда правка.')),
+      el('div', { class: 'actions' }, saveNow, exportBtn, el('span', { class: 'spacer' }), out,
+        el('button', { class: 'btn', text: tr('Закрыть'), on: { click: closeModal } }))
     ]);
   }
 
@@ -1957,36 +2613,51 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var repo = el('input', { id: 'c-repo', value: 'TOTALTASK', autocomplete: 'off' });
     var token = el('input', { id: 'c-token', type: 'password', placeholder: 'github_pat_…', autocomplete: 'off' });
     var err = el('div', { class: 'err', hidden: true });
-    var go = el('button', { class: 'btn primary', text: 'Подключить' });
+    var go = el('button', { class: 'btn primary', text: tr('Подключить') });
     function connect() {
       var c = { owner: owner.value.trim(), repo: repo.value.trim(), token: token.value.trim(), branch: '' };
-      if (!c.owner || !c.repo || !c.token) { err.hidden = false; err.textContent = 'Заполните все три поля.'; return; }
-      go.disabled = true; go.textContent = 'Проверяю…'; err.hidden = true;
+      if (!c.owner || !c.repo || !c.token) { err.hidden = false; err.textContent = tr('Заполните все три поля.'); return; }
+      go.disabled = true; go.textContent = tr('Проверяю…'); err.hidden = true;
       var b = new GitHubBackend(c);
-      b.check().then(function () { cfg = c; lsSet(CFG_KEY, cfg); start(new GitHubBackend(cfg), false); })
+      b.check().then(function () { cfg = c; lsSet(CFG_KEY, cfg); start(new GitHubBackend(cfg), 'github'); })
         .catch(function (e) {
-          go.disabled = false; go.textContent = 'Подключить'; err.hidden = false;
-          err.textContent = e.status === 401 ? 'Токен не подошёл. Проверьте, что скопировали его целиком.'
-            : e.status === 404 ? 'Репозиторий не найден, или у токена нет к нему доступа. Проверьте название и Repository access у токена.'
-            : e.status ? 'GitHub ответил: ' + e.message : 'Нет связи с GitHub. Проверьте интернет.';
+          go.disabled = false; go.textContent = tr('Подключить'); err.hidden = false;
+          err.textContent = e.status === 401 ? tr('Токен не подошёл. Проверьте, что скопировали его целиком.')
+            : e.status === 404 ? tr('Репозиторий не найден, или у токена нет к нему доступа. Проверьте название и Repository access у токена.')
+            : e.status ? tr('GitHub ответил: {m}', { m: e.message }) : tr('Нет связи с GitHub. Проверьте интернет.');
         });
     }
     go.addEventListener('click', connect);
     token.addEventListener('keydown', function (e) { if (e.key === 'Enter') connect(); });
+    var form = el('div', { class: 'gh-form', hidden: true },
+      el('p', { class: 'hint', text: tr('Создайте для этого репозитория токен с доступом Contents: Read and write. Токен останется только в этом браузере.') }),
+      el('div', { class: 'row2' }, field(tr('Владелец'), 'c-owner', owner), field(tr('Репозиторий'), 'c-repo', repo)),
+      field(tr('Токен GitHub'), 'c-token', token), err, el('div', { class: 'actions' }, go));
+    var ghBtn = el('button', { class: 'btn', text: tr('Подключить GitHub') });
+    ghBtn.addEventListener('click', function () { form.hidden = !form.hidden; if (!form.hidden) owner.focus(); });
+    var localBtn = el('button', { class: 'btn primary', text: tr('Начать локально') });
+    localBtn.addEventListener('click', function () { cfg = { mode: 'local' }; lsSet(CFG_KEY, cfg); start(new LocalBackend(), 'local'); });
+    var lang = el('select', { id: 'c-lang', 'aria-label': 'Language' });
+    LANGS.forEach(function (l) { var o = el('option', { value: l[0], text: l[1] }); if (l[0] === LANG) o.selected = true; lang.appendChild(o); });
+    lang.addEventListener('change', function () { settings.lang = lang.value; saveSettings(); setLang(lang.value); renderConnect(root); });
     root.appendChild(el('div', { class: 'connect' },
-      el('h1', { text: 'Подключите репозиторий задач' }),
-      el('p', { text: 'Задачи хранятся в вашем приватном репозитории GitHub. Введите токен с доступом Contents: Read and write к этому репозиторию. Токен останется только в этом браузере.' }),
-      el('div', { class: 'row2' }, field('Владелец', 'c-owner', owner), field('Репозиторий', 'c-repo', repo)),
-      field('Токен GitHub', 'c-token', token), err,
-      el('div', { class: 'actions' }, go, el('span', { class: 'spacer' }),
-        el('button', { class: 'btn', text: 'Посмотреть демо', on: { click: function () { start(new DemoBackend(), true); } } }))));
+      el('div', { class: 'connect-top' }, el('h1', { text: tr('Где хранить задачи?') }), lang),
+      el('div', { class: 'choice primary' },
+        el('div', { class: 'choice-head' }, el('h2', { text: tr('Локально') }), el('span', { class: 'badge', text: tr('Рекомендуем') })),
+        el('p', { text: tr('Всё остаётся в этом браузере. Без аккаунта, работает без интернета. Другие устройства и Claude эти данные не увидят.') }),
+        el('div', { class: 'actions' }, localBtn)),
+      el('div', { class: 'choice' },
+        el('div', { class: 'choice-head' }, el('h2', { text: tr('Бесплатная синхронизация через GitHub') }), el('span', { class: 'badge', text: 'Free sync' })),
+        el('p', { text: tr('Задачи лежат в вашем приватном репозитории GitHub: они одинаковы на всех устройствах, у них есть история, и с ними может работать Claude.') }),
+        el('div', { class: 'actions' }, ghBtn), form)));
     ['sync', 'search', 'btn-claude', 'new-task', 'btn-settings'].forEach(function (id) { $(id).hidden = true; });
   }
-  function start(b, isDemo) {
-    backend = b; demo = isDemo; files = {}; syncErr = null;
-    actions = repoKey() ? (lsGet('tt-pending-v1:' + repoKey()) || []) : [];
-    ['search', 'btn-claude', 'new-task', 'btn-settings'].forEach(function (id) { $(id).hidden = false; });
-    ensureFile(P_BOARD); ensureFile(P_INBOX); ensureFile(P_REPORT);
+  function start(b, m) {
+    backend = b; mode = m; files = {}; syncErr = null;
+    actions = lsGet('tt-pending-v1:' + repoKey()) || [];
+    ['search', 'new-task', 'btn-settings'].forEach(function (id) { $(id).hidden = false; });
+    $('btn-claude').hidden = m === 'local';
+    ensureFile(P_BOARD); ensureFile(P_INBOX); if (m === 'github') ensureFile(P_REPORT);
     actions.forEach(function (a) { a.ops.forEach(function (op) { ensureFile(op.path); }); });
     render();
     schedulePoll();
@@ -2005,9 +2676,9 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   $('sync').addEventListener('click', function () { if (actions.length) flush('manual'); else poll(); });
   ['pointerdown', 'keydown', 'input'].forEach(function (t) { document.addEventListener(t, activity, true); });
   document.addEventListener('visibilitychange', function () {
-    if (document.hidden) { if (settings.onHide) flush('hide'); } else poll();
+    if (document.hidden) { if (settings.onHide || mode === 'local') flush('hide'); } else poll();
   });
-  window.addEventListener('pagehide', function () { if (settings.onHide) flush('hide'); });
+  window.addEventListener('pagehide', function () { if (settings.onHide || mode === 'local') flush('hide'); });
   window.addEventListener('blur', function () { if (settings.onBlur) flush('blur'); });
   window.addEventListener('online', function () {
     if (!backend) return;
@@ -2018,7 +2689,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function () {});
   setInterval(function () { var d = todayISO; tickToday(); if (d !== todayISO) softRender(); else { var n = document.querySelector('.now'); if (n) n.style.top = (nowMin() * PPM) + 'px'; } }, 60000);
   setTop();
-  if (cfg && cfg.token && cfg.branch) start(new GitHubBackend(cfg), false);
+  if (cfg && cfg.mode === 'local') start(new LocalBackend(), 'local');
+  else if (cfg && cfg.token && cfg.branch) start(new GitHubBackend(cfg), 'github');
   else render();
   window.__tt = { files: function () { return files; }, actions: function () { return actions; }, flush: flush, backend: function () { return backend; } };
 })();
