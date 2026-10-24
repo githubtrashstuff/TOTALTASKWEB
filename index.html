@@ -291,8 +291,6 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .chip .ic-badge { font-size: 11px; flex: none; }
 .chip .lbls { flex: none; gap: 2px; }
 .chip .lbl { width: 10px; height: 4px; }
-.ev-h { position: absolute; left: 0; right: 0; height: 6px; cursor: ns-resize; }
-.ev-h.h-t { top: 0; } .ev-h.h-b { bottom: 0; }
 .ev.dragging-ev { z-index: 5; box-shadow: 0 6px 16px rgb(0 0 0 / .28); cursor: grabbing; opacity: 1; }
 .ev.ghost.editing { pointer-events: auto; box-shadow: 0 0 0 2px var(--accent); cursor: text; z-index: 6; }
 .ev-input { display: block; width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: inherit; font: inherit; font-weight: 600; padding: 0; caret-color: var(--accent); }
@@ -538,7 +536,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   /* ---------- состояние ---------- */
   var cfg = lsGet(CFG_KEY);
   var ui = lsGet(UI_KEY) || {};
-  var DEFAULT_SETTINGS = { layout: 'left', slide: 600, hover: 200, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
+  var DEFAULT_SETTINGS = { layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
     device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'телефон' : 'компьютер' };
   var settings = Object.assign({}, DEFAULT_SETTINGS, ui.settings || {});
   document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms');
@@ -1610,8 +1608,6 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   }
   function evNode(t, lane, lanes, cols, keys, off, span, big) {
     var node = el('div', { class: 'ev' + (isDone(t) ? ' done' : '') + (t.kind === 'routine' ? ' routine' : ''), data: { a: t.area }, tabindex: '0', title: t.title });
-    var h1 = el('div', { class: 'ev-h h-t' }), h2 = el('div', { class: 'ev-h h-b' });
-    node.appendChild(h1);
     var lb = labelBars(t); if (lb) node.appendChild(lb);
     node.appendChild(el('span', { class: 'ev-time' }));
     var row = el('span', { class: 'ev-row' }, stBtn(t), el('span', { class: 'ev-title', text: (t.priority ? 'P' + t.priority + ' · ' : '') + t.title }));
@@ -1622,13 +1618,17 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (t.estimate) meta.appendChild(el('span', { class: 'est', text: '~' + t.estimate + ' мин' }));
     if (t.carriedFrom && t.carriedFrom.length) meta.appendChild(el('span', { class: 'carried', title: 'Перенесена: ' + t.carriedFrom.join(', '), text: '↻' + t.carriedFrom.length }));
     if (meta.childNodes.length) node.appendChild(meta);
-    node.appendChild(h2);
     paintEv(node, t.start, endOf(t));
     off = off || 0; span = span || 1;
     node.style.left = 'calc(' + (off * 100 + lane * span * 100 / lanes) + '% + 1px)';
     node.style.width = 'calc(' + (span * 100 / lanes) + '% - 6px)';
     if (big) node.style.zIndex = '1';
-    node.addEventListener('pointerdown', function (e) { if (e.target.closest('.st')) return; evDown(e, t, node, e.target === h1 ? 'top' : e.target === h2 ? 'bottom' : 'move', cols, keys); });
+    function zone(e) {
+      var r = node.getBoundingClientRect(), g = Math.min(settings.grip, r.height / 3), y = e.clientY - r.top;
+      return y <= g ? 'top' : r.height - y <= g ? 'bottom' : 'move';
+    }
+    node.addEventListener('pointermove', function (e) { if (!interacting) node.style.cursor = zone(e) === 'move' ? '' : 'ns-resize'; });
+    node.addEventListener('pointerdown', function (e) { if (e.target.closest('.st')) return; evDown(e, t, node, zone(e), cols, keys); });
     node.addEventListener('keydown', function (e) { if (e.key === 'Enter') openTask(t.id); });
     node.addEventListener('contextmenu', function (e) { ctxMenu(e, t.id); });
     paintCard(node, t);
@@ -1831,6 +1831,12 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     ]);
     if (f.state === 'ready' && !demo) loadFile(P_REPORT).then(function () { var r = document.querySelector('.report'); if (r) r.textContent = files[P_REPORT].data || 'Отчёта пока нет.'; });
   }
+  function pxCtl(id, key, min, max) {
+    var r = el('input', { id: id, type: 'range', min: String(min), max: String(max), step: '1', value: String(settings[key]) });
+    var out = el('span', { class: 'hint', text: settings[key] + ' px' });
+    r.addEventListener('input', function () { settings[key] = +r.value; out.textContent = settings[key] + ' px'; saveSettings(); });
+    return el('div', { style: 'display:flex;align-items:center;gap:8px' }, r, out);
+  }
   function msCtl(id, key, max, step, after) {
     var r = el('input', { id: id, type: 'range', min: '0', max: String(max), step: String(step), value: String(settings[key]) });
     var out = el('span', { class: 'hint', text: (settings[key] / 1000).toFixed(2).replace(/0$/, '') + ' с' });
@@ -1873,6 +1879,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
         function (v) { settings.layout = v; $('view').dataset.layout = v; }), 'Расположение двух частей на широком экране.'),
       row('Скольжение между днями', 's-slide', msCtl('s-slide', 'slide', 2000, 100),
         'Как долго карточка плывёт в соседний день, когда вы тянете её в календаре. 0 — мгновенно.'),
+      row('Зона растягивания по краям блока', 's-grip', pxCtl('s-grip', 'grip', 1, 12),
+        'Сколько пикселей у верхнего и нижнего края блока в календаре занимает растягивание. Остальное: перенос.'),
       row('Контур при наведении', 's-hover', msCtl('s-hover', 'hover', 1000, 50, function () { document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms'); }),
         'Как быстро появляется и гаснет рамка вокруг карточки под курсором. 0 — мгновенно.'),
       row('Сохранять после паузы', 's-idle', sel('s-idle', settings.idle,
