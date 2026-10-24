@@ -315,7 +315,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .field label, .flabel { font-size: 12px; font-weight: 600; color: var(--muted); }
 .field input, .field select, .field textarea { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); width: 100%; }
-.field textarea { min-height: 80px; resize: vertical; }
+.field textarea { min-height: 80px; max-height: 60vh; resize: none; overflow-y: auto; }
 .check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
 .row2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -1783,6 +1783,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   function taskModal(task, isNew) {
     var title = el('input', { id: 'f-title', type: 'text', value: task.title, placeholder: 'Что нужно сделать' });
     var desc = el('textarea', { id: 'f-desc', placeholder: 'Описание: чем подробнее, тем точнее Claude оценит срок' }); desc.value = task.desc || '';
+    function grow() { desc.style.height = 'auto'; desc.style.height = desc.scrollHeight + 2 + 'px'; }
+    desc.addEventListener('input', grow);
     var status = el('select', { id: 'f-col' });
     columns().forEach(function (c) { var o = el('option', { value: c.id, text: c.title }); if (c.id === colOf(task).id) o.selected = true; status.appendChild(o); });
     var date = el('input', { id: 'f-date', type: 'date', value: task.date || '' });
@@ -1847,6 +1849,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       task.carriedFrom && task.carriedFrom.length ? el('p', { class: 'hint', text: 'Переносилась с недель: ' + task.carriedFrom.join(', ') }) : null,
       el('p', { class: 'hint', text: 'Без даты задача лежит в Inbox. С датой и временем стоит в сетке дня.' }),
       err, actions], title);
+    grow();
   }
   function claudeModal() {
     var f = ensureFile(P_REPORT);
