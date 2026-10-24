@@ -182,6 +182,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .pr[data-p="1"] { color: var(--warn); } .pr[data-p="2"] { color: var(--accent); }
 .carried { font-size: 11px; color: var(--amber); font-weight: 600; }
 .est { font-size: 12px; color: var(--muted); }
+.slot { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .due { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .due.over { color: var(--warn); font-weight: 600; }
 .due.today { color: var(--accent); font-weight: 600; }
@@ -834,6 +835,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (has('area')) ps.push('область ' + (areaName(t.area) || 'снята'));
     if (has('pinned')) ps.push(t.pinned ? 'закреплена' : 'откреплена');
     if (has('wip')) ps.push(t.wip ? 'в процессе' : 'не в процессе');
+    if (has('due') || has('dueEnd')) ps.push(t.due ? 'срок ' + dueText(t) : 'срок снят');
     if (has('color')) ps.push('цвет карточки');
     if (has('colors')) ps.push('метки');
     if (has('icons')) ps.push('значки');
@@ -1224,10 +1226,16 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     b.addEventListener('click', function (e) { e.stopPropagation(); setState(t.id, st === 'todo' ? 'wip' : st === 'wip' ? 'done' : 'todo'); });
     return b;
   }
-  function presetDate(kind) {
+  function dayPlus(n) { return iso(addDays(today, n)); }
+  function weekRange() {
     var dow = (today.getDay() + 6) % 7;
-    var n = { today: 0, tomorrow: 1, week: dow === 6 ? 7 : 6 - dow, next: 7 }[kind];
-    return iso(addDays(today, n));
+    return dow === 6 ? [dayPlus(1), dayPlus(7)] : [dayPlus(0), dayPlus(6 - dow)];
+  }
+  function dueText(t) {
+    var a = parse(t.due);
+    if (!t.dueEnd || t.dueEnd === t.due) return fmtShort.format(a);
+    var b = parse(t.dueEnd);
+    try { return fmtShort.formatRange(a, b); } catch (e) { return fmtShort.format(a) + ' – ' + fmtShort.format(b); }
   }
   var ctxEl = null, ctxOff = null;
   function closeCtx() {
@@ -1270,12 +1278,18 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       menu.appendChild(item(st === 'done' ? 'Вернуть в работу' : 'Выполнено', function () { setState(id, st === 'done' ? 'todo' : 'done'); build(); }, '', el('span', { class: 'st done' })));
       menu.appendChild(el('hr'));
       var ds = sec('Дата');
-      pills(ds, [
-        { label: 'Сегодня', v: presetDate('today') }, { label: 'Завтра', v: presetDate('tomorrow') },
-        { label: 'На неделе', v: presetDate('week') }, { label: '+7 дней', v: presetDate('next') }, { label: 'Без даты', v: null }
-      ].map(function (p) { p.title = p.v || 'убрать дату'; return p; }),
-        function (p) { return p.v === t.date; },
-        function (p) { change(function (d) { d.date = p.v; if (!p.v) { d.start = null; d.end = null; } }); });
+      var wr = weekRange(), dp = [{ label: 'Сегодня', v: dayPlus(0) }, { label: 'Завтра', v: dayPlus(1) }, { label: 'На неделе', v: wr[0], end: wr[1] }];
+      for (var k = 2; k <= 7; k++) dp.push({ label: '+' + k, v: dayPlus(k) });
+      dp.push({ label: 'Без даты', v: null });
+      dp.forEach(function (p) { p.title = p.v ? (p.end ? fmtShort.formatRange(parse(p.v), parse(p.end)) : fmtShort.format(parse(p.v))) : 'убрать дату с карточки'; });
+      pills(ds, dp,
+        function (p) { return p.v ? (t.due === p.v && (t.dueEnd || null) === (p.end || null)) : !t.due; },
+        function (p) {
+          var on = p.v && t.due === p.v && (t.dueEnd || null) === (p.end || null);
+          change(function (d) {
+            if (!p.v || on) { delete d.due; delete d.dueEnd; } else { d.due = p.v; if (p.end) d.dueEnd = p.end; else delete d.dueEnd; }
+          });
+        });
       sec('Цвет карточки').appendChild(colorPicker(t.color ? [t.color] : [], function (v) { change(function (d) { if (v[0]) d.color = v[0]; else delete d.color; }); }, true));
       sec('Метки').appendChild(colorPicker(t.colors || [], function (v) { change(function (d) { if (v.length) d.colors = v; else delete d.colors; }); }));
       var is = sec('Значки'); is.appendChild(iconPicker(t.icons || [], function (v) { change(function (d) { if (v.length) d.icons = v; else delete d.icons; }); }));
@@ -1308,10 +1322,14 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     };
   }
   function dueBadge(t) {
+    if (!t.due) return null;
+    var end = t.dueEnd || t.due, cls = 'due';
+    if (!isDone(t)) { if (end < todayISO) cls += ' over'; else if (t.due <= todayISO) cls += ' today'; }
+    return el('span', { class: cls, title: 'Срок', text: dueText(t) });
+  }
+  function slotBadge(t) {
     if (!t.date) return null;
-    var cls = 'due';
-    if (!isDone(t)) { if (t.date < todayISO) cls += ' over'; else if (t.date === todayISO) cls += ' today'; }
-    return el('span', { class: cls, text: fmtShort.format(parse(t.date)) + (t.start != null ? ' ' + hhmm(t.start) + '–' + hhmm(endOf(t)) : '') });
+    return el('span', { class: 'slot', title: 'Стоит в календаре', text: '◷ ' + fmtShort.format(parse(t.date)) + (t.start != null ? ' ' + hhmm(t.start) + '–' + hhmm(endOf(t)) : '') });
   }
 
   /* ---------- доска ---------- */
@@ -1400,6 +1418,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (t.priority) meta.appendChild(el('span', { class: 'pr', data: { p: String(t.priority) }, text: 'P' + t.priority }));
     if (t.area) meta.appendChild(el('span', { class: 'lb', data: { a: t.area }, text: areaName(t.area) }));
     var d = dueBadge(t); if (d) meta.appendChild(d);
+    var sl = slotBadge(t); if (sl) meta.appendChild(sl);
     if (t.estimate && t.start == null) meta.appendChild(el('span', { class: 'est', text: '~' + t.estimate + ' мин' }));
     if (t.carriedFrom && t.carriedFrom.length) meta.appendChild(el('span', { class: 'carried', title: 'Перенесена: ' + t.carriedFrom.join(', '), text: '↻' + t.carriedFrom.length }));
     (t.icons || []).slice().reverse().forEach(function (ic) { meta.insertBefore(el('span', { class: 'ic-badge', text: ic }), meta.firstChild); });
@@ -1729,6 +1748,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     });
     var est = el('input', { id: 'f-est', type: 'number', min: '5', step: '5', value: task.estimate || '', placeholder: 'мин' });
     var pin = el('input', { id: 'f-pin', type: 'checkbox' }); pin.checked = !!task.pinned;
+    var due = el('input', { id: 'f-due', type: 'date', value: task.due || '' }), dueE = el('input', { id: 'f-due2', type: 'date', value: task.dueEnd || '' });
     var cols = (task.colors || []).slice(), icos = (task.icons || []).slice(), cc = task.color || null;
     var err = el('div', { class: 'err', hidden: true });
     function commit() {
@@ -1738,6 +1758,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       task.area = area.value || null; task.priority = pr.value ? +pr.value : null;
       if (cols.length) task.colors = cols; else delete task.colors;
       if (cc) task.color = cc; else delete task.color;
+      if (due.value) { task.due = due.value; if (dueE.value > due.value) task.dueEnd = dueE.value; else delete task.dueEnd; } else { delete task.due; delete task.dueEnd; }
       if (icos.length) task.icons = icos; else delete task.icons;
       task.estimate = est.value ? Math.max(1, Math.round(+est.value)) : null;
       if (pin.checked) task.pinned = true; else delete task.pinned;
@@ -1770,6 +1791,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       el('div', { class: 'row2' }, field('Приоритет', 'f-pr', pr), field('Оценка, мин', 'f-est', est)),
       el('div', { class: 'row2' }, field('Область', 'f-area', area),
         el('div', { class: 'field' }, el('span', { class: 'flabel', text: 'Для Claude' }), el('label', { class: 'check', for: 'f-pin' }, pin, 'Не двигать при разборе'))),
+      el('div', { class: 'row2' }, field('Срок на карточке (только надпись)', 'f-due', due), field('Срок до (для диапазона)', 'f-due2', dueE)),
       el('div', { class: 'field' }, el('span', { class: 'flabel', text: 'Цвет карточки' }), colorPicker(cc ? [cc] : [], function (v) { cc = v[0] || null; }, true)),
       el('div', { class: 'field' }, el('span', { class: 'flabel', text: 'Метки' }), colorPicker(cols, function (v) { cols = v; })),
       el('div', { class: 'field' }, el('span', { class: 'flabel', text: 'Значки' }), iconPicker(icos, function (v) { icos = v; })),
