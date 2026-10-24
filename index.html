@@ -157,6 +157,11 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .pill { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 3px 9px; font-size: 12px; color: var(--fg); }
 .pill:hover { border-color: var(--muted); }
 .pill.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.ctx-row { display: flex; align-items: center; gap: 2px; }
+.ctx-row .ctx-item { flex: 1; }
+.ctx-ico { width: 32px; height: 32px; flex: none; border: 0; background: transparent; border-radius: 8px; color: var(--muted); display: grid; place-items: center; }
+.ctx-ico:hover { background: var(--col); color: var(--warn); }
+.split[data-layout="right"] .pane-cal { order: 2; }
 .ctx-item { border: 0; background: transparent; text-align: left; padding: 7px 8px; border-radius: 8px; display: flex; gap: 10px; align-items: center; width: 100%; color: var(--fg); }
 .ctx-item:hover { background: var(--col); }
 .ctx-item.danger { color: var(--warn); }
@@ -524,7 +529,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   /* ---------- состояние ---------- */
   var cfg = lsGet(CFG_KEY);
   var ui = lsGet(UI_KEY) || {};
-  var DEFAULT_SETTINGS = { slide: 600, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
+  var DEFAULT_SETTINGS = { layout: 'left', slide: 600, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
     device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'телефон' : 'компьютер' };
   var settings = Object.assign({}, DEFAULT_SETTINGS, ui.settings || {});
   var backend = null, demo = false;
@@ -899,7 +904,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var oldBoard = root.querySelector('.board'), keepLeft = oldBoard ? oldBoard.scrollLeft : 0;
     root.textContent = '';
     root.className = 'split';
-    root.dataset.tab = mtab;
+    root.dataset.tab = mtab; root.dataset.layout = settings.layout;
     var boardEl = renderBoard(weeks);
     root.appendChild(el('section', { class: 'pane pane-cal', 'aria-label': 'Календарь' }, renderCal()));
     root.appendChild(el('section', { class: 'pane pane-board', 'aria-label': 'Канбан' }, boardEl));
@@ -1253,7 +1258,14 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       var t = draftOf(id); if (!t) { closeCtx(); return; }
       menu.textContent = '';
       var st = stateOf(t);
-      menu.appendChild(item('Открыть', function () { closeCtx(); openTask(id); }));
+      var top = el('div', { class: 'ctx-row' }, item('Открыть', function () { closeCtx(); openTask(id); }));
+      if (t.date) {
+        var off = el('button', { type: 'button', class: 'ctx-ico', title: 'Убрать из календаря (останется в канбане)', 'aria-label': 'Убрать из календаря' });
+        off.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 6.5h12M5.5 1.8v2.4M10.5 1.8v2.4M6 10h4"/></svg>';
+        off.addEventListener('click', function () { var d = draftOf(id); closeCtx(); if (d) { d.date = null; d.start = null; d.end = null; commitTask(d); } });
+        top.appendChild(off);
+      }
+      menu.appendChild(top);
       menu.appendChild(item(st === 'wip' ? 'Снять «в процессе»' : 'В процессе', function () { setState(id, st === 'wip' ? 'todo' : 'wip'); build(); }, '', el('span', { class: 'st wip' })));
       menu.appendChild(item(st === 'done' ? 'Вернуть в работу' : 'Выполнено', function () { setState(id, st === 'done' ? 'todo' : 'done'); build(); }, '', el('span', { class: 'st done' })));
       menu.appendChild(el('hr'));
@@ -1826,6 +1838,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       el('h2', { text: 'Настройки' }), el('p', { class: 'hint', text: info }),
       el('p', { class: 'hint', text: n ? 'Не сохранено: ' + plural(n, 'действие', 'действия', 'действий') + '. Они хранятся в этом браузере и не пропадут при закрытии вкладки.'
         : 'Всё сохранено.' + (lastSubject ? ' Последний коммит: ' + lastSubject : '') }),
+      row('Календарь', 's-layout', sel('s-layout', settings.layout, [['left', 'Слева, канбан справа'], ['right', 'Справа, канбан слева']],
+        function (v) { settings.layout = v; $('view').dataset.layout = v; }), 'Расположение двух частей на широком экране.'),
       row('Скольжение между днями', 's-slide', slideCtl(),
         'Как долго карточка плывёт в соседний день, когда вы тянете её в календаре. 0 — мгновенно.'),
       row('Сохранять после паузы', 's-idle', sel('s-idle', settings.idle,
