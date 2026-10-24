@@ -1458,10 +1458,11 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     node.classList.toggle('short', (e - s) * PPM < 36);
     var tm = node.querySelector('.ev-time'); if (tm) tm.textContent = hhmm(s) + '–' + hhmm(e);
   }
-  function lanesFor(items) {
+  var BIG_MIN = 180;
+  function laneLayout(items) {
     items.sort(function (a, b) { return a.start - b.start || endOf(b) - endOf(a); });
-    var res = [], cluster = [], clusterEnd = -1, laneEnds = [];
-    function flush() { var n = laneEnds.length; cluster.forEach(function (r) { r.lanes = n; }); res = res.concat(cluster); cluster = []; laneEnds = []; clusterEnd = -1; }
+    var res = [], cluster = [], clusterEnd = -1, laneEnds = [], cid = 0;
+    function flush() { var n = laneEnds.length; cluster.forEach(function (r) { r.lanes = n; r.cl = cid; }); cid++; res = res.concat(cluster); cluster = []; laneEnds = []; clusterEnd = -1; }
     items.forEach(function (t) {
       var s = t.start, e = Math.max(endOf(t), s + 1);
       if (cluster.length && s >= clusterEnd) flush();
@@ -1470,6 +1471,24 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     });
     flush();
     return res;
+  }
+  function evSpan(t) { return Math.max(endOf(t), t.start + 1); }
+  function evOverlap(a, b) { return a.start < evSpan(b) && b.start < evSpan(a); }
+  function lanesFor(items) {
+    var res = laneLayout(items.slice()), groups = {};
+    res.forEach(function (r) { (groups[r.cl] = groups[r.cl] || []).push(r); });
+    var out = [];
+    Object.keys(groups).forEach(function (k) {
+      var g = groups[k], bigs = g.filter(function (r) { return evSpan(r.t) - r.t.start > BIG_MIN; });
+      var shorts = g.filter(function (r) { return bigs.indexOf(r) < 0; });
+      var bigsClash = bigs.some(function (a, i) { return bigs.slice(i + 1).some(function (b) { return evOverlap(a.t, b.t); }); });
+      if (!bigs.length || !shorts.length || bigsClash) { g.forEach(function (r) { r.off = 0; r.span = 1; out.push(r); }); return; }
+      bigs.forEach(function (r) { r.lane = 0; r.lanes = 1; r.off = 0; r.span = 1; r.big = true; out.push(r); });
+      var sub = laneLayout(shorts.map(function (r) { return r.t; })), half = {};
+      sub.forEach(function (r) { if (bigs.some(function (b) { return evOverlap(b.t, r.t); })) half[r.cl] = true; });
+      sub.forEach(function (r) { r.off = half[r.cl] ? 0.5 : 0; r.span = half[r.cl] ? 0.5 : 1; out.push(r); });
+    });
+    return out;
   }
   function minAt(colEl, y) { return (y - colEl.getBoundingClientRect().top) / PPM; }
   function evDown(e, t, node, mode, cols, keys) {
@@ -1511,7 +1530,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onCancel);
   }
-  function evNode(t, lane, lanes, cols, keys) {
+  function evNode(t, lane, lanes, cols, keys, off, span, big) {
     var node = el('div', { class: 'ev' + (isDone(t) ? ' done' : '') + (t.kind === 'routine' ? ' routine' : ''), data: { a: t.area }, tabindex: '0', title: t.title });
     var h1 = el('div', { class: 'ev-h h-t' }), h2 = el('div', { class: 'ev-h h-b' });
     node.appendChild(h1);
@@ -1519,8 +1538,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     node.appendChild(el('span', { class: 'ev-title', text: (t.priority ? 'P' + t.priority + ' · ' : '') + t.title }));
     node.appendChild(h2);
     paintEv(node, t.start, endOf(t));
-    node.style.left = 'calc(' + (lane * 100 / lanes) + '% + 1px)';
-    node.style.width = 'calc(' + (100 / lanes) + '% - 6px)';
+    off = off || 0; span = span || 1;
+    node.style.left = 'calc(' + (off * 100 + lane * span * 100 / lanes) + '% + 1px)';
+    node.style.width = 'calc(' + (span * 100 / lanes) + '% - 6px)';
+    if (big) node.style.zIndex = '1';
     node.addEventListener('pointerdown', function (e) { evDown(e, t, node, e.target === h1 ? 'top' : e.target === h2 ? 'bottom' : 'move', cols, keys); });
     node.addEventListener('keydown', function (e) { if (e.key === 'Enter') openTask(t.id); });
     node.addEventListener('contextmenu', function (e) { ctxMenu(e, t.id); });
@@ -1577,7 +1598,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     keys.forEach(function (key, ci) {
       var col = cols[ci];
       lanesFor(items.filter(function (t) { return t.date === key && t.start != null; }))
-        .forEach(function (r) { col.appendChild(evNode(r.t, r.lane, r.lanes, cols, keys)); });
+        .forEach(function (r) { col.appendChild(evNode(r.t, r.lane, r.lanes, cols, keys, r.off, r.span, r.big)); });
       if (key === todayISO) col.appendChild(el('div', { class: 'now', style: 'top:' + (nowMin() * PPM) + 'px' }));
       setDrop(col, function (id, s) {
         var d = draftOf(id); if (!d) return;
