@@ -631,6 +631,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "Exercise",
     "Свернуть": "Collapse",
     "Развернуть": "Expand",
+    "Громкость звука наведения": "Hover sound volume",
+    "Тихий звук при наведении на карточку, у каждого цвета свой.": "A soft sound when hovering a card; each color has its own.",
     "Подскок: размах масштаба": "Pop: scale overshoot",
     "Подскок: поворот": "Pop: rotation",
     "Подскок: смещение": "Pop: offset",
@@ -874,6 +876,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "Sport",
     "Свернуть": "Einklappen",
     "Развернуть": "Ausklappen",
+    "Громкость звука наведения": "Lautstärke Hover-Ton",
+    "Тихий звук при наведении на карточку, у каждого цвета свой.": "Leiser Ton beim Überfahren einer Karte, jede Farbe klingt anders.",
     "Подскок: размах масштаба": "Pop: Größenüberschwung",
     "Подскок: поворот": "Pop: Drehung",
     "Подскок: смещение": "Pop: Versatz",
@@ -1117,6 +1121,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "锻炼",
     "Свернуть": "折叠",
     "Развернуть": "展开",
+    "Громкость звука наведения": "悬停音效音量",
+    "Тихий звук при наведении на карточку, у каждого цвета свой.": "鼠标悬停在卡片上时的轻柔音效，每种颜色音调不同。",
     "Подскок: размах масштаба": "弹出：缩放幅度",
     "Подскок: поворот": "弹出：旋转",
     "Подскок: смещение": "弹出：位移",
@@ -1186,7 +1192,21 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     error: [{ f: 160, d: .16, type: 'square', g: .09 }, { f: 130, d: .18, at: .1, type: 'square', g: .09 }],
     save: [{ f: 700, d: .07, g: .14 }, { f: 1050, d: .1, at: .06, g: .14 }]
   };
-  function sfx(name, pitch) {
+  // тихий звук при наведении на карточку, у каждого цвета свой тон и тембр
+  var HOVER_TONES = { red: [523, 'triangle'], orange: [587, 'sine'], yellow: [659, 'triangle'], green: [784, 'sine'], teal: [880, 'sine'],
+    blue: [698, 'triangle'], purple: [466, 'sine'], pink: [932, 'triangle'], none: [392, 'sine'] };
+  var AREA_COLOR = { work: 'blue', home: 'orange', finance: 'green', health: 'pink', food: 'yellow', sleep: 'purple', personal: 'teal' };
+  function hoverKey(n) {
+    var cc = (n.style.getPropertyValue('--cc') || '').trim().toLowerCase();
+    if (cc) for (var i = 0; i < COLORS.length; i++) if (COLORS[i].hex.toLowerCase() === cc) return COLORS[i].id;
+    return AREA_COLOR[n.dataset.a] || 'none';
+  }
+  function sfxHover(key) {
+    var tone = HOVER_TONES[key] || HOVER_TONES.none;
+    SOUNDS['hover_' + key] = [{ f: tone[0], d: .07, type: tone[1], g: .5 }, { f: tone[0] * 2, d: .05, g: .15 }];
+    sfx('hover_' + key, 1, settings.hoverVol * 0.4);
+  }
+  function sfx(name, pitch, vol) {
     if (!settings.sound || quiet) return;
     var now = performance.now();
     if (lastSfx[name] && now - lastSfx[name] < 40) return;
@@ -1194,7 +1214,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     try {
       if (!audioCtx) { var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; audioCtx = new AC(); }
       if (audioCtx.state === 'suspended') audioCtx.resume();
-      var v = clamp(settings.volume / 100, 0, 1), spec = SOUNDS[name]; if (!v || !spec) return;
+      var v = clamp((vol != null ? vol : settings.volume) / 100, 0, 1), spec = SOUNDS[name]; if (!v || !spec) return;
       var t0 = audioCtx.currentTime;
       spec.forEach(function (n) {
         var o = audioCtx.createOscillator(), g = audioCtx.createGain(), s0 = t0 + (n.at || 0), d = n.d || .08, peak = (n.g || .2) * v;
@@ -1361,7 +1381,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   var cfg = lsGet(CFG_KEY);
   var ui = lsGet(UI_KEY) || {};
   PPM = clamp(+ui.ppm || 1, 0.4, 8);
-  var DEFAULT_SETTINGS = { entrance: 'pop', entranceMs: 900, popScale: 25, popRot: 40, popMove: 40, calW: 50, calWF: 33, sound: true, volume: 50, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
+  var DEFAULT_SETTINGS = { entrance: 'pop', entranceMs: 900, popScale: 25, popRot: 40, popMove: 40, calW: 50, calWF: 33, sound: true, volume: 50, hoverVol: 25, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
     lang: 'en', device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'phone' : 'computer' };
   var settings = Object.assign({}, DEFAULT_SETTINGS, ui.settings || {});
   document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms');
@@ -1736,6 +1756,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   function presetAsTask(p) { return { id: p.id, title: p.title, kind: 'routine', estimate: p.duration, start: null, end: null, icons: p.icons }; }
   // новый экземпляр рутины для календаря (ещё не сохранён)
   function instDraft(p) {
+    if (!showRoutines()) { ui.showRoutine = true; lsSet(UI_KEY, ui); }
     var d = newDraft({ title: p.title, kind: 'routine', presetId: p.id, estimate: p.duration, rc: p.color || null });
     if (p.icons && p.icons.length) d.icons = p.icons.slice();
     return d;
@@ -1940,7 +1961,9 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     }
   }
   var lastView = '';
-  function viewKey() { return [calMode, iso(calDate), PPM, settings.layout, mtab, query, ui.showRoutine ? 1 : 0, narrow.matches ? 1 : 0].join('|'); }
+  function viewKey() { return [calMode, iso(calDate), PPM, settings.layout, mtab, query, showRoutines() ? 1 : 0, narrow.matches ? 1 : 0].join('|'); }
+  function showRoutines() { return ui.showRoutine !== false; }
+  function shownTask(t) { return matches(t) && (showRoutines() || t.kind !== 'routine'); }
   function motionKey(n) { return (n.classList.contains('ev') ? 'e:' : 'c:') + n.dataset.id; }
   function snapRects() {
     var m = {};
@@ -2481,7 +2504,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var wrap = el('div', { class: 'pane-inner', style: 'display:contents' });
     var wnums = weeks.map(function (w) { return +w.slice(6); });
     var show = el('input', { type: 'checkbox', id: 'show-routine' });
-    show.checked = !!ui.showRoutine;
+    show.checked = showRoutines();
     show.addEventListener('change', function () { ui.showRoutine = show.checked; lsSet(UI_KEY, ui); render(); });
     wrap.appendChild(el('div', { class: 'board-bar' },
       el('span', { text: wnums.length > 1 ? tr('Inbox и недели {a}–{b}', { a: wnums[0], b: wnums[wnums.length - 1] }) : tr('Inbox и неделя {a}', { a: wnums[0] }) }),
@@ -2649,7 +2672,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var dim = new Date(cm.getFullYear(), cm.getMonth() + 1, 0).getDate();
     var rows = Math.ceil((((cm.getDay() + 6) % 7) + dim) / 7);
     var byDate = {};
-    all().forEach(function (t) { if (t.date && matches(t) && (ui.showRoutine || t.kind !== 'routine')) (byDate[t.date] = byDate[t.date] || []).push(t); });
+    all().forEach(function (t) { if (t.date && matches(t) && (showRoutines() || t.kind !== 'routine')) (byDate[t.date] = byDate[t.date] || []).push(t); });
     for (var i = 0; i < rows * 7; i++) (function (date) {
       var key = iso(date);
       var add = el('button', { class: 'add-day', title: tr('Добавить задачу'), 'aria-label': tr('Добавить задачу на ') + key, text: '+',
@@ -2663,8 +2686,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       setDrop(cell, function (id) { var d = getDraft(id); if (!d) return; d.date = key; commitTask(d); });
       grid.appendChild(cell);
     })(addDays(start, i));
-    var hint = el('p', { class: 'hint', text: ui.showRoutine ? '' : tr('Распорядок скрыт в месяце. Включите «Показывать распорядок» над доской.') });
-    return el('div', { class: 'cal-scroll' }, grid, ui.showRoutine ? null : el('div', { style: 'padding:8px' }, hint));
+    return el('div', { class: 'cal-scroll' }, grid);
   }
 
   function paintEv(node, s, e) {
@@ -2691,7 +2713,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   }
   function relayoutCol(colEl, extra, skipId) {
     var key = colEl && colEl.dataset.key; if (!key) return;
-    var items = all().filter(matches).filter(function (t) { return t.date === key && t.start != null && t.id !== skipId && !(extra && extra.id === t.id); });
+    var items = all().filter(shownTask).filter(function (t) { return t.date === key && t.start != null && t.id !== skipId && !(extra && extra.id === t.id); });
     var fake = null;
     if (extra) { fake = { id: extra.id, start: extra.s, end: extra.e }; items.push(fake); }
     lanesFor(items).forEach(function (r) {
@@ -2856,7 +2878,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     });
     top.appendChild(head);
     var ad = el('div', { class: 'tg-row tg-allday', style: 'grid-template-columns:' + tpl }, el('div', { class: 'tg-adl', text: tr('весь день') }));
-    var items = all().filter(matches);
+    var items = all().filter(shownTask);
     keys.forEach(function (key) {
       var cell = el('div', { class: 'tg-ad' });
       items.filter(function (t) { return t.date === key && t.start == null; }).forEach(function (t) { cell.appendChild(chipNode(t)); });
@@ -3149,6 +3171,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       row(tr('Подскок: смещение'), 's-popm', rngCtl('s-popm', 'popMove', 0, 100, replayIntro)),
       row(tr('Звуки'), 's-sound', chk('s-sound', settings.sound, function (v) { settings.sound = v; if (v) sfx('save'); }), tr('Короткие звуки при создании, переносе, выполнении и удалении.')),
       row(tr('Громкость звуков'), 's-vol', pctCtl('s-vol', 'volume')),
+      row(tr('Громкость звука наведения'), 's-hvol', rngCtl('s-hvol', 'hoverVol', 0, 100, function () { sfxHover('green'); }), tr('Тихий звук при наведении на карточку, у каждого цвета свой.')),
       mode === 'local' ? null : row(tr('Сохранять после паузы'), 's-idle', sel('s-idle', settings.idle,
         [[15, tr('15 секунд')], [30, tr('30 секунд')], [60, tr('1 минута')], [120, tr('2 минуты')], [300, tr('5 минут')], [600, tr('10 минут')], [0, tr('Не сохранять по паузе')]],
         function (v) { settings.idle = +v; scheduleFlush(); }),
@@ -3233,6 +3256,16 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   /* ---------- оболочка ---------- */
   function setTop() { document.documentElement.style.setProperty('--top', $('top').offsetHeight + 'px'); }
   window.addEventListener('resize', setTop);
+  var lastHover = null;
+  $('view').addEventListener('pointerover', function (e) {
+    if (e.pointerType === 'touch' || drag || dragId || interacting) return;
+    var n = e.target.closest && e.target.closest('.card, .ev, .chip');
+    if (!n || n.classList.contains('ghost') || n.classList.contains('drag-src')) { return; }
+    if (e.relatedTarget && n.contains(e.relatedTarget)) return;
+    if (n === lastHover && performance.now() - (n._hv || 0) < 300) return;
+    lastHover = n; n._hv = performance.now();
+    sfxHover(hoverKey(n));
+  });
   $('mt-cal').addEventListener('click', function () { mtab = 'cal'; introFlag = true; introUntil = performance.now() + 800; render(); });
   $('mt-board').addEventListener('click', function () { mtab = 'board'; introFlag = true; introUntil = performance.now() + 800; render(); });
   $('new-task').addEventListener('click', function () { openNew({}); });
