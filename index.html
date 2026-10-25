@@ -160,6 +160,12 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   box-shadow: inset 0 1px 0 rgb(255 255 255 / .38), inset 0 -2px 5px rgb(0 0 0 / .2), 0 3px 8px rgb(0 0 0 / .22), 0 1px 2px rgb(0 0 0 / .2);
 }
 .ev.has-cc.dragging-ev { box-shadow: inset 0 1px 0 rgb(255 255 255 / .38), inset 0 -2px 5px rgb(0 0 0 / .2), 0 10px 22px rgb(0 0 0 / .35); }
+.card.preset { background: var(--surface); border: 2px solid var(--cc, var(--line)); padding: 9px 11px; cursor: grab; }
+.card.preset .dur { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.col.routines { background: var(--surface); border: 1px dashed var(--line); }
+.col.routines .col-name { flex: 1; margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 15px; padding: 4px 6px; }
+.ev.has-pc, .chip.has-pc { background: var(--col); color: var(--fg); border: 2px solid var(--cc); border-left: 2px solid var(--cc); opacity: 1; --abg: var(--col); --afg: var(--fg); }
+.ev.has-pc.routine, .chip.has-pc.routine { border-style: solid; opacity: 1; }
 .ev.has-cc { --abg: var(--fill, color-mix(in srgb, var(--cc) 80%, var(--surface))); --afg: var(--ct); border-left-color: color-mix(in srgb, var(--cc), #000 25%); }
 .ctx { position: fixed; z-index: 60; width: 272px; max-height: calc(100dvh - 16px); overflow: auto; background: var(--surface); border: 1px solid var(--line);
   border-radius: 12px; padding: 6px; box-shadow: 0 12px 32px rgb(0 0 0 / .28); font-size: 13px; display: flex; flex-direction: column; gap: 2px; }
@@ -381,8 +387,13 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     { id: 'food', name: 'Еда' }, { id: 'sleep', name: 'Сон' }, { id: 'personal', name: 'Личное' }
   ];
   var CFG_KEY = 'tt-gh-v1', UI_KEY = 'tt-ui-v1', LOCAL_KEY = 'tt-local-v1';
+  function defaultPresets() {
+    return [['sleep', 'Сон', 480, 'blue'], ['breakfast', 'Завтрак', 25, 'orange'], ['lunch', 'Обед', 45, 'yellow'], ['dinner', 'Ужин', 40, 'red'],
+      ['shower', 'Душ', 15, 'teal'], ['commute', 'Дорога', 30, 'purple'], ['nap', 'Дневной сон', 20, 'pink'], ['exercise', 'Зарядка', 20, 'green']]
+      .map(function (r, i) { return { id: 'p_' + r[0], kind: 'preset', title: tr(r[1]), duration: r[2], color: r[3], order: i + 1 }; });
+  }
   function defaultBoard() { return { columns: [{ id: 'backlog', title: tr('Бэклог') }, { id: 'doing', title: tr('В работе') }, { id: 'waiting', title: tr('Ждёт') }, { id: 'done', title: tr('Готово'), done: true }] }; }
-  var P_BOARD = 'data/board.json', P_INBOX = 'data/inbox.json', P_REPORT = 'data/reports/latest.md';
+  var P_BOARD = 'data/board.json', P_INBOX = 'data/inbox.json', P_REPORT = 'data/reports/latest.md', P_PRESETS = 'data/presets.json';
   var PPM = 1;
   /* ---------- язык ---------- */
   var I18N = {
@@ -593,7 +604,22 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Автоцвет: новые карточки получают цвет автоматически": "Auto color: new cards get a color automatically",
     "Звуки": "Sounds",
     "Короткие звуки при создании, переносе, выполнении и удалении.": "Short sounds for creating, moving, completing and deleting.",
-    "Громкость звуков": "Sound volume"
+    "Громкость звуков": "Sound volume",
+    "Рутины": "Routines",
+    "+ Рутина": "+ Routine",
+    "Название рутины": "Routine name",
+    "Рутина": "Routine",
+    "Длительность, мин": "Duration, min",
+    "Длительность": "Duration",
+    "Редактировать": "Edit",
+    " ч": " h",
+    "Дневной сон": "Nap",
+    "Завтрак": "Breakfast",
+    "Обед": "Lunch",
+    "Ужин": "Dinner",
+    "Душ": "Shower",
+    "Дорога": "Commute",
+    "Зарядка": "Exercise"
    },
    "de": {
     "Бэклог": "Backlog",
@@ -802,7 +828,22 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Автоцвет: новые карточки получают цвет автоматически": "Autofarbe: neue Karten erhalten automatisch eine Farbe",
     "Звуки": "Töne",
     "Короткие звуки при создании, переносе, выполнении и удалении.": "Kurze Töne beim Erstellen, Verschieben, Erledigen und Löschen.",
-    "Громкость звуков": "Lautstärke"
+    "Громкость звуков": "Lautstärke",
+    "Рутины": "Routinen",
+    "+ Рутина": "+ Routine",
+    "Название рутины": "Routinenname",
+    "Рутина": "Routine",
+    "Длительность, мин": "Dauer, Min.",
+    "Длительность": "Dauer",
+    "Редактировать": "Bearbeiten",
+    " ч": " Std.",
+    "Дневной сон": "Mittagsschlaf",
+    "Завтрак": "Frühstück",
+    "Обед": "Mittagessen",
+    "Ужин": "Abendessen",
+    "Душ": "Dusche",
+    "Дорога": "Fahrt",
+    "Зарядка": "Sport"
    },
    "zh": {
     "Бэклог": "待办",
@@ -1011,7 +1052,22 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Автоцвет: новые карточки получают цвет автоматически": "自动配色：新卡片自动获得颜色",
     "Звуки": "声音",
     "Короткие звуки при создании, переносе, выполнении и удалении.": "创建、移动、完成和删除时播放简短提示音。",
-    "Громкость звуков": "音量"
+    "Громкость звуков": "音量",
+    "Рутины": "日常",
+    "+ Рутина": "+ 日常",
+    "Название рутины": "日常名称",
+    "Рутина": "日常",
+    "Длительность, мин": "时长（分钟）",
+    "Длительность": "时长",
+    "Редактировать": "编辑",
+    " ч": " 小时",
+    "Дневной сон": "小睡",
+    "Завтрак": "早餐",
+    "Обед": "午餐",
+    "Ужин": "晚餐",
+    "Душ": "洗澡",
+    "Дорога": "通勤",
+    "Зарядка": "锻炼"
    }
   };
   var LANGS = [['en', 'English'], ['ru', 'Русский'], ['de', 'Deutsch'], ['zh', '中文']];
@@ -1268,6 +1324,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   function isJsonPath(p) { return /\.json$/.test(p); }
   function defaultFor(p) {
     if (p === P_BOARD) return defaultBoard();
+    if (p === P_PRESETS) return { tasks: defaultPresets() };
     if (p === P_REPORT) return '';
     var m = /^data\/weeks\/(.+)\.json$/.exec(p);
     if (m) return { week: m[1], start: iso(weekStartOf(m[1])), tasks: [] };
@@ -1512,7 +1569,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   function buildIndex() {
     index = {};
     Object.keys(files).forEach(function (p) {
-      if (p === P_BOARD || !isJsonPath(p)) return;
+      if (p === P_BOARD || p === P_PRESETS || !isJsonPath(p)) return;
       (files[p].data.tasks || []).forEach(function (t) { if (!index[t.id]) index[t.id] = { t: t, path: p }; });
     });
   }
@@ -1595,10 +1652,148 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var t = { id: uid(), title: '', desc: '', status: columns()[0].id, date: null, start: null, end: null, priority: null, estimate: null,
       area: null, order: Date.now(), source: 'user', created: new Date().toISOString() };
     for (var k in extra) t[k] = extra[k];
-    if (ui.autoColor && !t.color) { var i = ui.acNext || 0; t.color = COLORS[i % COLORS.length].id; ui.acNext = (i + 1) % COLORS.length; lsSet(UI_KEY, ui); }
+    if (ui.autoColor && !t.color && t.kind !== 'routine') { var i = ui.acNext || 0; t.color = COLORS[i % COLORS.length].id; ui.acNext = (i + 1) % COLORS.length; lsSet(UI_KEY, ui); }
     return t;
   }
   function endOf(t) { return t.end != null ? t.end : Math.min(1440, t.start + 60); }
+
+  /* ---------- рутины: пресеты, которые тянутся в календарь ---------- */
+  function presets() { return (ensureFile(P_PRESETS).data.tasks || []).slice().sort(function (a, b) { return (a.order || 0) - (b.order || 0); }); }
+  function findPreset(id) { var l = presets(); for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i]; return null; }
+  function durText(m) {
+    if (m < 60) return m + tr(' мин');
+    return Math.floor(m / 60) + tr(' ч') + (m % 60 ? ' ' + (m % 60) + tr(' мин') : '');
+  }
+  function presetAsTask(p) { return { id: p.id, title: p.title, kind: 'routine', estimate: p.duration, start: null, end: null, icons: p.icons }; }
+  // новый экземпляр рутины для календаря (ещё не сохранён)
+  function instDraft(p) {
+    var d = newDraft({ title: p.title, kind: 'routine', presetId: p.id, estimate: p.duration, rc: p.color || null });
+    if (p.icons && p.icons.length) d.icons = p.icons.slice();
+    return d;
+  }
+  function getDraft(x) { return x && typeof x === 'object' ? x : draftOf(x); }
+  function commitPreset(d) {
+    var list = ensureFile(P_PRESETS).data.tasks, prev = null, fields = {}, changed = [];
+    for (var i = 0; i < list.length; i++) if (list[i].id === d.id) prev = list[i];
+    d.updated = new Date().toISOString();
+    if (prev) {
+      Object.keys(Object.assign({}, prev, d)).forEach(function (k) {
+        if (k === 'updated') return;
+        var a = prev[k] === undefined ? null : prev[k], b = d[k] === undefined ? null : d[k];
+        if (JSON.stringify(a) !== JSON.stringify(b)) { changed.push(k); fields[k] = b; }
+      });
+      if (!changed.length) { render(); return; }
+      fields.updated = d.updated;
+    }
+    sfx(prev ? 'tick' : 'create');
+    addAction([{ cls: 'рутина', text: '«' + d.title + '»' + (prev ? ': ' + changed.join(', ') : ' создана') }],
+      [{ k: 'put', path: P_PRESETS, id: d.id, full: clone(d), fields: prev ? fields : {} }]);
+    render();
+  }
+  function removePreset(id) {
+    var p = findPreset(id); if (!p) return;
+    sfx('delete');
+    addAction([{ cls: 'рутина', text: 'удалена «' + p.title + '»' }], [{ k: 'del', path: P_PRESETS, id: id }]);
+    render();
+  }
+  function newPreset(title, duration) {
+    var l = presets(), last = l.length ? l[l.length - 1].order || 0 : 0;
+    return { id: 'p_' + uid().slice(2), kind: 'preset', title: title, duration: duration || 30, order: last + 1, color: null };
+  }
+  // убрать из календаря: рутина-экземпляр удаляется, обычная задача остаётся на канбане
+  function unschedule(id) {
+    var d = draftOf(id); if (!d || !d.date) return;
+    if (d.kind === 'routine' && d.presetId) { removeTask(id); return; }
+    d.date = null; d.start = null; d.end = null; commitTask(d);
+  }
+  function presetCard(p) {
+    var meta = el('div', { class: 'meta' }, el('span', { class: 'dur', text: durText(p.duration) }));
+    (p.icons || []).slice().reverse().forEach(function (ic) { meta.insertBefore(el('span', { class: 'ic-badge', text: ic }), meta.firstChild); });
+    var c = el('button', { class: 'card preset', data: { id: p.id, preset: '1' } }, el('div', { class: 'card-head' }, el('span', { class: 'card-title', text: p.title })), meta);
+    if (p.color) c.style.setProperty('--cc', colorHex(p.color));
+    c.addEventListener('click', function () { presetModal(p); });
+    c.addEventListener('contextmenu', function (e) { presetMenu(e, p.id); });
+    attachDrag(c, p.id);
+    return c;
+  }
+  function routinesColumn() {
+    var list = el('div', { class: 'cards' });
+    presets().forEach(function (p) { list.appendChild(presetCard(p)); });
+    var addBtn = el('button', { class: 'add-card', text: tr('+ Рутина') });
+    addBtn.addEventListener('click', function () { inlineInput(addBtn, tr('Название рутины'), function (v) { commitPreset(newPreset(v, 30)); }); });
+    return el('section', { class: 'col routines' },
+      el('div', { class: 'col-head' }, el('h3', { class: 'col-name', text: '↻ ' + tr('Рутины') }), el('span', { class: 'count', text: String(list.children.length) })),
+      list, addBtn);
+  }
+  function presetModal(p) {
+    var d = clone(p);
+    var title = el('input', { id: 'p-title', type: 'text', value: d.title, placeholder: tr('Название рутины') });
+    var dur = el('input', { id: 'p-dur', type: 'number', min: '5', step: '5', value: String(d.duration) });
+    var cc = d.color ? [d.color] : [], icos = (d.icons || []).slice();
+    var pills = el('div', { class: 'ctx-pills' });
+    [15, 30, 45, 60, 90, 120, 480].forEach(function (m) {
+      var b = el('button', { type: 'button', class: 'pill', text: durText(m) });
+      b.addEventListener('click', function () { dur.value = String(m); });
+      pills.appendChild(b);
+    });
+    function save() {
+      var v = title.value.trim() || 'empty', n = Math.max(5, Math.round(+dur.value || 30));
+      d.title = v; d.duration = n;
+      if (cc[0]) d.color = cc[0]; else delete d.color;
+      if (icos.length) d.icons = icos; else delete d.icons;
+      commitPreset(d); closeModal();
+    }
+    title.addEventListener('keydown', function (e) { if (e.key === 'Enter') save(); });
+    var del = el('button', { class: 'btn danger', text: tr('Удалить') });
+    del.addEventListener('click', function () { arm(del, 'pdel', tr('Точно удалить?'), function () { removePreset(d.id); closeModal(); }); });
+    showModal(tr('Рутина'), [
+      el('h2', { text: tr('Рутина') }), field(tr('Название'), 'p-title', title),
+      field(tr('Длительность, мин'), 'p-dur', dur), pills,
+      el('div', { class: 'field' }, el('span', { class: 'flabel', text: tr('Цвет карточки') }), colorPicker(cc, function (v) { cc = v; }, true)),
+      el('div', { class: 'field' }, el('span', { class: 'flabel', text: tr('Значки') }), iconPicker(icos, function (v) { icos = v; })),
+      el('div', { class: 'actions' }, el('button', { class: 'btn primary', text: tr('Сохранить'), on: { click: save } }),
+        el('button', { class: 'btn', text: tr('Отмена'), on: { click: closeModal } }), el('span', { class: 'spacer' }), del)
+    ], title, save);
+  }
+  function presetMenu(e, id) {
+    e.preventDefault(); e.stopPropagation();
+    closeCtx(); sfx('menu');
+    var menu = ctxEl = el('div', { class: 'ctx', role: 'menu' });
+    function sec(label) { var n = el('div', { class: 'ctx-sec' }, el('span', { class: 'ctx-lab', text: label })); menu.appendChild(n); return n; }
+    function item(label, fn, cls) { var b = el('button', { type: 'button', class: 'ctx-item' + (cls ? ' ' + cls : ''), role: 'menuitem' }, el('span', { text: label })); b.addEventListener('click', function () { fn(b); }); return b; }
+    function change(fn) { var p = findPreset(id); if (!p) { closeCtx(); return; } var d = clone(p); fn(d); commitPreset(d); build(); }
+    function build() {
+      var p = findPreset(id); if (!p) { closeCtx(); return; }
+      menu.textContent = '';
+      menu.appendChild(item(tr('Редактировать'), function () { closeCtx(); presetModal(p); }));
+      menu.appendChild(el('hr'));
+      var ds = sec(tr('Длительность')), row = el('div', { class: 'ctx-pills' });
+      [15, 30, 45, 60, 90, 120, 480].forEach(function (m) {
+        var b = el('button', { type: 'button', class: 'pill' + (p.duration === m ? ' on' : ''), text: durText(m) });
+        b.addEventListener('click', function () { change(function (d) { d.duration = m; }); });
+        row.appendChild(b);
+      });
+      ds.appendChild(row);
+      sec(tr('Цвет карточки')).appendChild(colorPicker(p.color ? [p.color] : [], function (v) { change(function (d) { if (v[0]) d.color = v[0]; else delete d.color; }); }, true));
+      sec(tr('Значки')).appendChild(iconPicker(p.icons || [], function (v) { change(function (d) { if (v.length) d.icons = v; else delete d.icons; }); }));
+      menu.appendChild(el('hr'));
+      menu.appendChild(item(tr('Дублировать'), function () { var d = clone(p); d.id = newPreset('', 0).id; d.order = (p.order || 0) + 0.5; closeCtx(); commitPreset(d); }));
+      menu.appendChild(item(tr('Удалить'), function (b) { arm(b, 'pctxdel', tr('Точно удалить?'), function () { closeCtx(); removePreset(id); }); }, 'danger'));
+    }
+    build();
+    document.body.appendChild(menu);
+    var w = menu.offsetWidth, h = menu.offsetHeight;
+    menu.style.left = Math.max(8, Math.min(e.clientX, innerWidth - w - 8)) + 'px';
+    menu.style.top = Math.max(8, Math.min(e.clientY, innerHeight - h - 8)) + 'px';
+    function down(ev) { if (!menu.contains(ev.target)) closeCtx(); }
+    function key(ev) { if (ev.key === 'Escape') { ev.stopPropagation(); closeCtx(); } }
+    window.addEventListener('pointerdown', down, true); window.addEventListener('keydown', key, true);
+    window.addEventListener('blur', closeCtx); window.addEventListener('resize', closeCtx);
+    ctxOff = function () {
+      window.removeEventListener('pointerdown', down, true); window.removeEventListener('keydown', key, true);
+      window.removeEventListener('blur', closeCtx); window.removeEventListener('resize', closeCtx);
+    };
+  }
 
   /* ---------- общий рендер ---------- */
   function busy() {
@@ -1653,7 +1848,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (!backend) { renderConnect(root); return; }
     var weeks = visibleWeeks();
     weeks.forEach(function (w) { ensureFile(weekPath(w)); });
-    ensureFile(P_INBOX); ensureFile(P_BOARD);
+    ensureFile(P_INBOX); ensureFile(P_BOARD); ensureFile(P_PRESETS);
     buildIndex();
     var oldBoard = root.querySelector('.board'), keepLeft = oldBoard ? oldBoard.scrollLeft : 0;
     var vk = viewKey(), prevRects = lastView === vk && root.firstChild ? snapRects() : null; lastView = vk;
@@ -1712,12 +1907,14 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     return t.id;
   }
   function dragStart(node, id, x, y, pid, alt) {
-    var d0 = draftOf(id); if (!d0 || !node.isConnected) return;
+    var pr = node.dataset.preset ? findPreset(id) : null;
+    var d0 = pr ? presetAsTask(pr) : draftOf(id); if (!d0 || !node.isConnected) return;
     try { node.releasePointerCapture(pid); } catch (e) {}
     var r = node.getBoundingClientRect(), isCard = node.classList.contains('card');
     var S = drag = { id: id, node: node, d0: d0, isCard: isCard, h: isCard ? r.height : 52, gx: x - r.left, gy: y - r.top, x: x, y: y, lx: x, tt: 0,
-      px: r.left, py: r.top, tgt: null, ph: null, phList: null, phRef: null, pv: null, pvStart: 0, ctrl: false, t: performance.now(), done: false, cp: !!alt };
+      px: r.left, py: r.top, tgt: null, ph: null, phList: null, phRef: null, pv: null, pvStart: 0, ctrl: false, t: performance.now(), done: false, cp: !!alt || !!pr, preset: pr };
     S.dur = d0.start != null ? endOf(d0) - d0.start : (d0.estimate || 60);
+    if (pr) S.isCard = false;
     dragId = id; sfx('pick');
     document.body.classList.add('is-dragging');
     var inner = node.cloneNode(true);
@@ -1818,6 +2015,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   function dragUpdate(S) {
     var t = findTarget(S.x, S.y);
     if (t && t.keep) t = S.tgt;
+    if (t && S.preset && (t.kind === 'list' || t.node.classList.contains('inbox'))) t = null;
     S.tgt = t;
     if (!t) { releaseList(S); clearPv(S); S.inner.style.opacity = '1'; return; }
     if (t.kind === 'list') { clearPv(S); updateList(S, t.node); S.inner.style.opacity = '1'; return; }
@@ -1920,7 +2118,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       });
       else {
         var pvEl = S.pv && S.pv.el, rectOf = function () { return pvEl.getBoundingClientRect(); };
-        var go = function () { var nid = S.cp ? dupTask(S.id) : S.id; if (nid) { if (t.kind === 'ev') dz.drop(nid, S.pvStart); else dz.drop(nid); } };
+        var go = function () { var nid = S.preset ? instDraft(S.preset) : S.cp ? dupTask(S.id) : S.id; if (nid) { if (t.kind === 'ev') dz.drop(nid, S.pvStart); else dz.drop(nid); } };
         if (pvEl) flyInto(S, rectOf, function () { close(go, false); }); else close(go, true);
       }
       return;
@@ -1942,6 +2140,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   function colorHex(id) { for (var i = 0; i < COLORS.length; i++) if (COLORS[i].id === id) return COLORS[i].hex; return '#888'; }
   function toggled(arr, v) { var i = arr.indexOf(v), r = arr.slice(); if (i >= 0) r.splice(i, 1); else r.push(v); return r; }
   function paintCard(node, t) {
+    if (t.kind === 'routine' && t.rc && !t.color) { node.classList.add('has-pc'); node.style.setProperty('--cc', colorHex(t.rc)); return; }
     if (!t.color) return;
     var h = colorHex(t.color), lum = (0.299 * parseInt(h.substr(1, 2), 16) + 0.587 * parseInt(h.substr(3, 2), 16) + 0.114 * parseInt(h.substr(5, 2), 16)) / 255;
     node.classList.add('has-cc'); node.style.setProperty('--cc', h); node.style.setProperty('--ct', lum > 0.62 ? '#1b1b1b' : '#fff');
@@ -2109,9 +2308,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       el('label', { for: 'show-routine' }, show, tr('Показывать распорядок'))));
     var scope = {}; weeks.forEach(function (w) { scope[weekPath(w)] = 1; }); scope[P_INBOX] = 1;
     var tasks = Object.keys(index).map(function (k) { return index[k]; })
-      .filter(function (e) { return scope[e.path] && (ui.showRoutine || e.t.kind !== 'routine'); })
+      .filter(function (e) { return scope[e.path] && e.t.kind !== 'routine'; })
       .map(function (e) { return e.t; });
     var boardEl = el('div', { class: 'board' });
+    boardEl.appendChild(routinesColumn());
     var cols = columns();
     cols.forEach(function (col, ci) {
       var inCol = tasks.filter(function (t) { return colOf(t).id === col.id; })
@@ -2194,7 +2394,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     }
     var c = el('button', { class: 'card' + (isDone(t) ? ' done' : ''), data: { id: t.id, a: t.color ? null : t.area } }, lbls,
       el('div', { class: 'card-head' }, stBtn(t), el('span', { class: 'card-title', text: t.title })), meta.childNodes.length ? meta : null);
-    c.addEventListener('click', function () { openTask(t.id); });
+    c.addEventListener('click', function (e) { if (e.shiftKey) unschedule(t.id); else openTask(t.id); });
     c.addEventListener('contextmenu', function (e) { ctxMenu(e, t.id); });
     paintCard(c, t);
     attachDrag(c, t.id);
@@ -2208,7 +2408,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     (t.icons || []).forEach(function (ic) { c.appendChild(el('span', { class: 'ic-badge', text: ic })); });
     var lb = labelBars(t); if (lb) c.appendChild(lb);
     paintCard(c, t);
-    c.addEventListener('click', function () { openTask(t.id); });
+    c.addEventListener('click', function (e) { if (e.shiftKey) unschedule(t.id); else openTask(t.id); });
     c.addEventListener('contextmenu', function (e) { ctxMenu(e, t.id); });
     attachDrag(c, t.id);
     return c;
@@ -2259,7 +2459,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var list = el('div', { class: 'inbox-list' });
     undated.forEach(function (t) { list.appendChild(chipNode(t)); });
     inbox.appendChild(list);
-    setDrop(inbox, function (id) { var d = draftOf(id); if (!d) return; d.date = null; d.start = null; d.end = null; commitTask(d); });
+    setDrop(inbox, function (id) { var d = getDraft(id); if (!d) return; d.date = null; d.start = null; d.end = null; commitTask(d); });
     wrap.appendChild(inbox);
     return wrap;
   }
@@ -2282,7 +2482,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       items.slice(0, 3).forEach(function (t) { cell.appendChild(chipNode(t)); });
       if (items.length > 3) cell.appendChild(el('button', { class: 'more add-card', text: tr('ещё {n}', { n: items.length - 3 }),
         on: { click: function () { calDate = date; setMode('day'); } } }));
-      setDrop(cell, function (id) { var d = draftOf(id); if (!d) return; d.date = key; commitTask(d); });
+      setDrop(cell, function (id) { var d = getDraft(id); if (!d) return; d.date = key; commitTask(d); });
       grid.appendChild(cell);
     })(addDays(start, i));
     var hint = el('p', { class: 'hint', text: ui.showRoutine ? '' : tr('Распорядок скрыт в месяце. Включите «Показывать распорядок» над доской.') });
@@ -2366,9 +2566,9 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       else { s = s0; en = clamp(snap(m, ev.ctrlKey), s0 + 1, 1440); }
       cur.s = s; cur.e = en; paintEv(node, s, en);
     }
-    function onUp() {
+    function onUp(ev) {
       stop(); interacting = false;
-      if (!moved) { needRender = false; openTask(t.id); return; }
+      if (!moved) { needRender = false; if (ev && ev.shiftKey) unschedule(t.id); else openTask(t.id); return; }
       var d = draftOf(t.id); if (!d) { render(); return; }
       if (alt) { d.id = uid(); d.created = new Date().toISOString(); d.order = (d.order || 0) + 1; delete d.carriedFrom; delete d.aiNote; delete d.pinned; }
       d.start = cur.s; d.end = cur.e; d.date = keys[cur.i]; commitTask(d);
@@ -2456,7 +2656,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       items.filter(function (t) { return t.date === key && t.start == null; }).forEach(function (t) { cell.appendChild(chipNode(t)); });
       cell.appendChild(el('button', { class: 'add-day', title: tr('Задача на весь день'), 'aria-label': tr('Добавить задачу на ') + key, text: '+',
         on: { click: function () { openNew({ date: key }); } } }));
-      setDrop(cell, function (id) { var d = draftOf(id); if (!d) return; d.date = key; d.start = null; d.end = null; commitTask(d); });
+      setDrop(cell, function (id) { var d = getDraft(id); if (!d) return; d.date = key; d.start = null; d.end = null; commitTask(d); });
       ad.appendChild(cell);
     });
     top.appendChild(ad);
@@ -2496,7 +2696,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
         .forEach(function (r) { var n = evNode(r.t, r.lane, r.lanes, cols, keys, r.off, r.span, r.big); col.appendChild(n); });
       if (key === todayISO) col.appendChild(el('div', { class: 'now', style: 'top:' + (nowMin() * PPM) + 'px' }));
       setDrop(col, function (id, s) {
-        var d = draftOf(id); if (!d) return;
+        var d = getDraft(id); if (!d) return;
         var dur = clamp(d.start != null ? endOf(d) - d.start : (d.estimate || 60), 5, 1440);
         d.date = key; d.start = s; d.end = s + dur; commitTask(d);
       });
@@ -2801,7 +3001,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     actions = lsGet('tt-pending-v1:' + repoKey()) || [];
     ['search', 'new-task', 'btn-settings'].forEach(function (id) { $(id).hidden = false; });
     $('btn-claude').hidden = m === 'local';
-    ensureFile(P_BOARD); ensureFile(P_INBOX); if (m === 'github') ensureFile(P_REPORT);
+    ensureFile(P_BOARD); ensureFile(P_INBOX); ensureFile(P_PRESETS); if (m === 'github') ensureFile(P_REPORT);
     actions.forEach(function (a) { a.ops.forEach(function (op) { ensureFile(op.path); }); });
     render();
     schedulePoll();
