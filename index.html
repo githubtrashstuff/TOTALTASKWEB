@@ -2297,12 +2297,13 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     paintCard(node, t);
     return node;
   }
+  var inlineCur = null;
   function inlineCreate(ghost, key, a, b) {
     var inp = el('input', { class: 'ev-input', placeholder: tr('Название'), 'aria-label': tr('Название задачи'), maxlength: '200' });
     ghost.classList.add('editing'); ghost.appendChild(inp);
     var done = false;
     function finish(commit) {
-      if (done) return; done = true;
+      if (done) return; done = true; inlineCur = null;
       var v = inp.value.trim();
       ghost.remove(); interacting = false;
       if (commit && v) commitTask(newDraft({ title: v, date: key, start: a, end: b }));
@@ -2313,6 +2314,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
     });
     inp.addEventListener('blur', function () { finish(true); });
+    inlineCur = { finish: finish };
     setTimeout(function () { inp.focus(); }, 0);
   }
   function timeGrid(n) {
@@ -2381,8 +2383,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       col.addEventListener('pointerdown', function (e) {
         if (e.button !== 0 || e.target !== col || e.pointerType === 'touch') return;
         e.preventDefault();
+        var c = col;
+        if (inlineCur) { inlineCur.finish(true); c = document.querySelectorAll('.tg-col')[ci] || col; }
         interacting = true;
-        var startM = clamp(snap(minAt(col, e.clientY), e.ctrlKey), 0, 1439);
+        var startM = clamp(snap(minAt(c, e.clientY), e.ctrlKey), 0, 1439);
         var y0 = e.clientY, moved = false, ghost = null, a = startM, b = startM + 1;
         function stop() { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); }
         function onMove(ev) {
@@ -2390,9 +2394,9 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
             if (Math.abs(ev.clientY - y0) < 6) return;
             moved = true;
             ghost = el('div', { class: 'ev ghost', style: 'left:1px;width:calc(100% - 6px)' }, el('span', { class: 'ev-time' }));
-            col.appendChild(ghost);
+            c.appendChild(ghost);
           }
-          var m = clamp(snap(minAt(col, ev.clientY), ev.ctrlKey), 0, 1440);
+          var m = clamp(snap(minAt(c, ev.clientY), ev.ctrlKey), 0, 1440);
           a = Math.min(startM, m); b = Math.max(startM, m); if (b - a < 1) b = a + 1;
           paintEv(ghost, a, b);
         }
