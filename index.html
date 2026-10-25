@@ -19,6 +19,7 @@
 /* Layout: sticky top bar; calendar pane left, kanban right, each filling the viewport height; on phones one pane at a time via tabs. */
 :root {
   --bg: #F6F3F2; --surface: #FFFFFF; --fg: #241F21; --muted: #7B7174; --line: #E6E0DF; --col: #EEE9E8;
+  --night: rgb(20 36 110 / .40);
   --accent: #E8505D; --accent-ink: #FFFFFF; --accent-soft: #FCE6E8; --warn: #B3261E; --ok: #1E6B3E; --amber: #9A5B00;
   --a-work-bg: #DDEBFA; --a-work-fg: #1F5A99;
   --a-home-bg: #FCEBD0; --a-home-fg: #8A5300;
@@ -34,6 +35,7 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
+    --night: rgb(30 52 150 / .45);
     --bg: #18151A; --surface: #242026; --fg: #F2EDED; --muted: #A59CA0; --line: #3A3238; --col: #1F1B21;
     --accent: #FF6977; --accent-ink: #2A0A0E; --accent-soft: #4A2328; --warn: #FF9A93; --ok: #8FD6A9; --amber: #F2CE92;
     --a-work-bg: #20384F; --a-work-fg: #A8CDF2;
@@ -279,6 +281,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .tg-gutter span { position: absolute; right: 6px; font-size: 11px; color: var(--muted); transform: translateY(-50%); font-variant-numeric: tabular-nums; }
 .tg-col { position: relative; border-left: 1px solid var(--line); min-width: 0;
   background-image: repeating-linear-gradient(to bottom, var(--line) 0, var(--line) 1px, transparent 1px, transparent var(--hr, 60px)); }
+.night { position: absolute; left: 0; right: 0; background: var(--night); pointer-events: none; z-index: 0; }
 .now { position: absolute; left: 0; right: 0; height: 2px; background: var(--accent); z-index: 3; pointer-events: none; }
 .now::before { content: ""; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .ev { position: absolute; z-index: 2; border: 1px solid var(--line); border-left: 3px solid var(--afg, var(--muted)); border-radius: 6px;
@@ -2926,6 +2929,12 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var cols = keys.map(function (k) { var c = el('div', { class: 'tg-col', data: { key: k }, style: 'height:' + (1440 * PPM) + 'px' }); body.appendChild(c); return c; });
     keys.forEach(function (key, ci) {
       var col = cols[ci];
+      // 23:00–07:00: время сна, фон колонки тёмно-синий (только цвет, без действий)
+      [[0, 420], [1380, 1440]].forEach(function (r) {
+        var nz = el('div', { class: 'night', 'aria-hidden': 'true' });
+        nz.style.top = (r[0] * PPM) + 'px'; nz.style.height = ((r[1] - r[0]) * PPM) + 'px';
+        col.appendChild(nz);
+      });
       lanesFor(items.filter(function (t) { return t.date === key && t.start != null; }))
         .forEach(function (r) { var n = evNode(r.t, r.lane, r.lanes, cols, keys, r.off, r.span, r.big); col.appendChild(n); });
       if (key === todayISO) col.appendChild(el('div', { class: 'now', style: 'top:' + (nowMin() * PPM) + 'px' }));
