@@ -300,6 +300,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .ev.routine { opacity: .78; border-style: dashed; border-left-style: solid; }
 .ev.done { opacity: .5; }
 .ev.done .ev-title { text-decoration: line-through; }
+.ev-dur { display: block; font-size: 13px; font-weight: 700; color: var(--accent); filter: brightness(2); font-variant-numeric: tabular-nums; }
+.ev.short .ev-dur { display: inline; flex: none; margin-right: 6px; }
 .ev-time { display: block; font-size: 11px; opacity: .85; font-variant-numeric: tabular-nums; }
 .ev-title { font-weight: 600; overflow-wrap: anywhere; }
 .ev.short { display: flex; align-items: center; gap: 6px; padding-block: 0; white-space: nowrap; }
@@ -2801,6 +2803,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     node.classList.toggle('short', (e - s) * PPM < 36);
     node.classList.toggle('tiny', (e - s) * PPM < 64);
     var tm = node.querySelector('.ev-time'); if (tm) tm.textContent = hhmm(s) + '–' + hhmm(e);
+    var dr = node.querySelector('.ev-dur'); if (dr) dr.textContent = durText(e - s);
     if (node.isConnected) fitDesc(node);
   }
   function fitDesc(node) {
@@ -2870,7 +2873,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     document.querySelectorAll('.tg .ev').forEach(fitDesc);
   }
   function zoomTick(now) {
-    var dt = Math.min(now - zoom.last, 50); zoom.last = now;
+    var dt = clamp(now - zoom.last, 1, 50); zoom.last = now;
     var k = 1 - Math.exp(-dt / Math.max(settings.zoomMs / 3, 1));
     var next = PPM * Math.pow(zoom.target / PPM, k);
     if (Math.abs(Math.log(zoom.target / next)) < 0.002) next = zoom.target;
@@ -2881,12 +2884,29 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   function zoomBy(dy, clientY) {
     var tg = document.querySelector('.tg'); if (!tg) return;
     var top = tg.querySelector('.tg-top'), r = tg.getBoundingClientRect();
+    if (sscroll.raf) { cancelAnimationFrame(sscroll.raf); sscroll.raf = 0; }
     zoom.yy = clientY - r.top;
     zoom.am = (tg.scrollTop + zoom.yy - (top ? top.offsetHeight : 0)) / PPM;
-    zoom.target = clamp((zoom.raf ? zoom.target : PPM) * Math.exp(-dy * 0.0015), 0.4, 16);
+    zoom.target = clamp((zoom.raf ? zoom.target : PPM) * Math.exp(-dy * 0.0045), 0.4, 16);
     sfx('slot');
     if (settings.zoomMs <= 0) { applyZoom(zoom.target); zoomAnchor(); zoomDone(); return; }
     if (!zoom.raf) { zoom.last = performance.now(); zoom.raf = requestAnimationFrame(zoomTick); }
+  }
+  // плавная прокрутка колесом: то же время сглаживания, что и у зума
+  var sscroll = { target: 0, raf: 0, last: 0 };
+  function scrollTick(now) {
+    var tg = document.querySelector('.tg'); if (!tg) { sscroll.raf = 0; return; }
+    var dt = clamp(now - sscroll.last, 1, 50); sscroll.last = now;
+    var k = 1 - Math.exp(-dt / Math.max(settings.zoomMs / 3, 1)), cur = tg.scrollTop, next = cur + (sscroll.target - cur) * k;
+    if (Math.abs(sscroll.target - next) < 1) next = sscroll.target;
+    tg.scrollTop = next; gridScroll = tg.scrollTop;
+    if (next === sscroll.target || tg.scrollTop === cur) sscroll.raf = 0; else sscroll.raf = requestAnimationFrame(scrollTick);
+  }
+  function smoothScrollBy(dy) {
+    var tg = document.querySelector('.tg'); if (!tg || zoom.raf) return;
+    if (!sscroll.raf) sscroll.target = tg.scrollTop;
+    sscroll.target = clamp(sscroll.target + dy, 0, tg.scrollHeight - tg.clientHeight);
+    if (!sscroll.raf) { sscroll.last = performance.now(); sscroll.raf = requestAnimationFrame(scrollTick); }
   }
   // пробел: вернуться к линии текущего времени
   function scrollToNow() {
@@ -3077,10 +3097,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
     });
     scroller.addEventListener('wheel', function (e) {
-      if (!(e.ctrlKey || (settings.wheel === 'zoom' ? !e.altKey : e.altKey))) return;
       if (interacting || dragId || $('modal-root').firstChild) return;
-      e.preventDefault();
-      zoomBy(e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY, e.clientY);
+      var dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * scroller.clientHeight : e.deltaY;
+      if (e.ctrlKey || (settings.wheel === 'zoom' ? !e.altKey : e.altKey)) { e.preventDefault(); zoomBy(dy, e.clientY); return; }
+      if (settings.zoomMs > 0 && !e.shiftKey && e.deltaY) { e.preventDefault(); smoothScrollBy(dy); }
     }, { passive: false });
     var body = el('div', { class: 'tg-body', style: 'grid-template-columns:' + tpl });
     var gut = el('div', { class: 'tg-gutter', style: 'height:' + (1440 * PPM) + 'px' });
@@ -3122,7 +3142,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
           if (!moved) {
             if (Math.abs(ev.clientY - y0) < 6) return;
             moved = true;
-            ghost = el('div', { class: 'ev ghost', style: 'left:1px;width:calc(100% - 6px)' }, el('span', { class: 'ev-time' }));
+            ghost = el('div', { class: 'ev ghost', style: 'left:1px;width:calc(100% - 6px)' }, el('span', { class: 'ev-dur' }), el('span', { class: 'ev-time' }));
             c.appendChild(ghost);
           }
           var m = clamp(snap(minAt(c, ev.clientY), ev.ctrlKey), 0, 1440);
