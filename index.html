@@ -634,6 +634,13 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "Exercise",
     "Свернуть": "Collapse",
     "Развернуть": "Expand",
+    "Анимация посадки карточки": "Card placement animation",
+    "Как карточка «садится» в календарь при перетаскивании.": "How a card lands in the calendar when you drop it.",
+    "Скольжение": "Glide",
+    "Пружина": "Spring",
+    "Штамп": "Stamp",
+    "Растворение": "Morph",
+    "Выпрыгивание": "Pop",
     "Сдвиг высоты звука наведения": "Hover sound pitch shift",
     "В полутонах (±12 — это октава). Один сдвиг для всех цветов.": "In semitones (±12 = one octave). One shift for all colors.",
     "Громкость звука наведения": "Hover sound volume",
@@ -881,6 +888,13 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "Sport",
     "Свернуть": "Einklappen",
     "Развернуть": "Ausklappen",
+    "Анимация посадки карточки": "Animation beim Platzieren der Karte",
+    "Как карточка «садится» в календарь при перетаскивании.": "Wie eine Karte beim Ablegen im Kalender landet.",
+    "Скольжение": "Gleiten",
+    "Пружина": "Feder",
+    "Штамп": "Stempel",
+    "Растворение": "Überblenden",
+    "Выпрыгивание": "Aufpoppen",
     "Сдвиг высоты звука наведения": "Tonhöhe des Hover-Tons",
     "В полутонах (±12 — это октава). Один сдвиг для всех цветов.": "In Halbtönen (±12 = eine Oktave). Eine Verschiebung für alle Farben.",
     "Громкость звука наведения": "Lautstärke Hover-Ton",
@@ -1128,6 +1142,13 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "锻炼",
     "Свернуть": "折叠",
     "Развернуть": "展开",
+    "Анимация посадки карточки": "卡片落位动画",
+    "Как карточка «садится» в календарь при перетаскивании.": "放入日历时卡片落位的方式。",
+    "Скольжение": "滑行",
+    "Пружина": "弹簧",
+    "Штамп": "盖章",
+    "Растворение": "渐变",
+    "Выпрыгивание": "弹出",
     "Сдвиг высоты звука наведения": "悬停音效音高偏移",
     "В полутонах (±12 — это октава). Один сдвиг для всех цветов.": "以半音为单位（±12 为一个八度）。所有颜色共用同一偏移。",
     "Громкость звука наведения": "悬停音效音量",
@@ -1390,7 +1411,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   var cfg = lsGet(CFG_KEY);
   var ui = lsGet(UI_KEY) || {};
   PPM = clamp(+ui.ppm || 1, 0.4, 8);
-  var DEFAULT_SETTINGS = { entrance: 'pop', entranceMs: 900, popScale: 25, popRot: 40, popMove: 40, calW: 50, calWF: 33, sound: true, volume: 50, hoverVol: 25, hoverShift: 0, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
+  var DEFAULT_SETTINGS = { entrance: 'pop', entranceMs: 900, popScale: 25, popRot: 40, popMove: 40, calW: 50, calWF: 33, placeFx: 'glide', sound: true, volume: 50, hoverVol: 25, hoverShift: 0, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
     lang: 'en', device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'phone' : 'computer' };
   var settings = Object.assign({}, DEFAULT_SETTINGS, ui.settings || {});
   document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms');
@@ -2287,20 +2308,44 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       if (Math.abs(r.left - S.px) + Math.abs(r.top - S.py) < 1.2 || now - t0 > 450) done(); else requestAnimationFrame(step);
     })(t0 + 16);
   }
-  function flyInto(S, rectOf, done) {
-    var dur = settings.slide;
+  var EASE = {
+    outCubic: function (k) { return 1 - Math.pow(1 - k, 3); },
+    outQuart: function (k) { return 1 - Math.pow(1 - k, 4); },
+    inOut: function (k) { return k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; },
+    back: function (k) { var c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2); }
+  };
+  // полёт клона в точку посадки; o: dur, ease, fade ('late' | 'linear' | 'none'), lift (масштаб «поднятой» карточки)
+  function flyInto(S, rectOf, done, o) {
+    o = o || {};
+    var dur = o.dur != null ? o.dur : settings.slide;
     if (dur <= 0) { done(); return; }
-    var inner = S.inner, w0 = S.wrap.offsetWidth, h0 = S.wrap.offsetHeight, x0 = S.px, y0 = S.py, t0 = 0;
-    inner.style.transition = 'none'; inner.style.opacity = '1'; inner.style.scale = '1'; S.tt = 0; inner.offsetHeight;
-    inner.style.transition = 'opacity ' + dur + 'ms ease-in, scale .18s'; inner.style.opacity = '0.15';
+    var ease = o.ease || EASE.outCubic, inner = S.inner, w0 = S.wrap.offsetWidth, h0 = S.wrap.offsetHeight, x0 = S.px, y0 = S.py, t0 = 0;
+    inner.style.transition = 'scale .16s'; inner.style.opacity = '1'; inner.style.scale = o.lift ? String(o.lift) : '1'; S.tt = 0;
     requestAnimationFrame(function step(now) {
       if (!t0) t0 = now;
-      var k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3), r = rectOf();
+      var k = Math.min(1, (now - t0) / dur), e = ease(k), r = rectOf();
       S.px = x0 + (r.left - x0) * e; S.py = y0 + (r.top - y0) * e;
       S.wrap.style.width = (w0 + (r.width - w0) * e) + 'px'; S.wrap.style.height = (h0 + (r.height - h0) * e) + 'px';
+      inner.style.opacity = o.fade === 'late' ? (k < .7 ? 1 : 1 - (k - .7) / .3 * .85) : o.fade === 'linear' ? 1 - k * .85 : 1;
+      if (o.lift && k > .55) inner.style.scale = '1';
       placeClone(S);
       if (k < 1) requestAnimationFrame(step); else done();
     });
+  }
+  function findPlaced(id) { return id ? document.querySelector('.ev[data-id="' + id + '"], .chip[data-id="' + id + '"]') : null; }
+  // эффект «посадки» уже созданного блока в календаре
+  function landFx(v, id) {
+    var n = findPlaced(id); if (!n) return;
+    if (v === 'spring') {
+      n.style.transformOrigin = '50% 0%';
+      n.animate([{ transform: 'scale(1,1.2)' }, { transform: 'scale(1.08,.88)', offset: .4 }, { transform: 'scale(.98,1.05)', offset: .72 }, { transform: 'none' }], { duration: 420, easing: 'ease-out' });
+    } else if (v === 'stamp') {
+      sfx('drop');
+      n.animate([{ transform: 'scale(1.16)', boxShadow: '0 0 0 0 rgba(232,80,93,.7)' }, { transform: 'scale(1)', boxShadow: '0 0 0 18px rgba(232,80,93,0)' }], { duration: 380, easing: 'cubic-bezier(.2,.8,.3,1)' });
+    } else if (v === 'pop') {
+      sfx('pop', 1.1);
+      n.animate([{ transform: 'scale(0) rotate(-7deg)' }, { transform: 'scale(1.14) rotate(2deg)', offset: .6 }, { transform: 'scale(1) rotate(0deg)' }], { duration: 360, easing: 'cubic-bezier(.2,.8,.3,1)' });
+    }
   }
   function finish(commit) {
     var S = drag; if (!S || S.done) return;
@@ -2311,7 +2356,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var t = S.tgt, wasCommit = commit;
     if (commit && t && t.kind === 'list' && S.isCard && !S.cp && S.phList === S.homeList && S.phRef === S.homeRef) commit = false;
     if (!commit) sfx(wasCommit ? 'tick' : 'cancel');
-    function close(commitFn, fade) {
+    function close(commitFn, fade, keep) {
       drag = null; dragId = null; document.body.classList.remove('is-dragging');
       if (commitFn) { commitFn(); if (S.node.isConnected) render(); }
       else {
@@ -2320,6 +2365,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
         if (S.liveCol) { relayoutCol(S.liveCol, null); S.liveCol = null; }
         if (needRender) render();
       }
+      if (keep) return;
       if (fade) { S.wrap.style.transition = 'opacity .14s'; S.wrap.style.opacity = '0'; setTimeout(function () { S.wrap.remove(); }, 160); }
       else S.wrap.remove();
     }
@@ -2330,8 +2376,26 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       });
       else {
         var pvEl = S.pv && S.pv.el, rectOf = function () { return pvEl.getBoundingClientRect(); };
-        var go = function () { var nid = S.preset ? instDraft(S.preset) : S.cp ? dupTask(S.id) : S.id; if (nid) { if (t.kind === 'ev') dz.drop(nid, S.pvStart); else dz.drop(nid); } };
-        if (pvEl) flyInto(S, rectOf, function () { close(go, false); }); else close(go, true);
+        var go = function () {
+          var nid = S.preset ? instDraft(S.preset) : S.cp ? dupTask(S.id) : S.id;
+          if (nid) { S.landId = typeof nid === 'object' ? nid.id : nid; if (t.kind === 'ev') dz.drop(nid, S.pvStart); else dz.drop(nid); }
+        };
+        var v = settings.placeFx, D = settings.slide;
+        if (!pvEl || D <= 0) close(go, !pvEl);
+        else if (v === 'pop') {
+          S.inner.style.transition = 'opacity .09s'; S.inner.style.opacity = '0';
+          setTimeout(function () { close(go, false); landFx('pop', S.landId); }, 100);
+        } else if (v === 'morph') {
+          close(go, false, true);
+          var nn = findPlaced(S.landId);
+          if (nn) {
+            nn.animate([{ opacity: 0 }, { opacity: 1 }], { duration: D, easing: 'ease-in', fill: 'backwards' });
+            flyInto(S, function () { return nn.getBoundingClientRect(); }, function () { S.wrap.remove(); }, { dur: D, ease: EASE.inOut, fade: 'linear' });
+          } else S.wrap.remove();
+        } else {
+          var o = v === 'spring' ? { dur: D * .6, ease: EASE.back, fade: 'late' } : v === 'stamp' ? { dur: D * .7, ease: EASE.outQuart, fade: 'none', lift: 1.15 } : { dur: D, ease: EASE.outQuart, fade: 'late' };
+          flyInto(S, rectOf, function () { close(go, false); landFx(v, S.landId); }, o);
+        }
       }
       return;
     }
@@ -2609,7 +2673,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 
   /* ---------- календарь ---------- */
   function chipNode(t) {
-    var c = el('button', { class: 'chip' + (isDone(t) ? ' done' : '') + (t.kind === 'routine' ? ' routine' : ''), title: t.title, data: { a: t.area } },
+    var c = el('button', { class: 'chip' + (isDone(t) ? ' done' : '') + (t.kind === 'routine' ? ' routine' : ''), title: t.title, data: { a: t.area, id: t.id } },
       el('span', { class: 'dot' }), stBtn(t), el('span', { class: 't', text: (t.start != null ? hhmm(t.start) + ' ' : '') + t.title }));
     (t.icons || []).forEach(function (ic) { c.appendChild(el('span', { class: 'ic-badge', text: ic })); });
     var lb = labelBars(t); if (lb) c.appendChild(lb);
@@ -3174,6 +3238,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
         function (v) { settings.layout = v; $('view').dataset.layout = v; applyColumns(); }), tr('Расположение двух частей на широком экране.')),
       row(tr('Скольжение между днями'), 's-slide', msCtl('s-slide', 'slide', 2000, 100),
         tr('Как долго карточка плывёт в соседний день, когда вы тянете её в календаре. 0 — мгновенно.')),
+      row(tr('Анимация посадки карточки'), 's-placefx', sel('s-placefx', settings.placeFx, [['glide', tr('Скольжение')], ['spring', tr('Пружина')], ['stamp', tr('Штамп')], ['morph', tr('Растворение')], ['pop', tr('Выпрыгивание')]],
+        function (v) { settings.placeFx = v; }), tr('Как карточка «садится» в календарь при перетаскивании.')),
       row(tr('Зона растягивания по краям блока'), 's-grip', pxCtl('s-grip', 'grip', 1, 12),
         tr('Сколько пикселей у верхнего и нижнего края блока в календаре занимает растягивание. Остальное: перенос.')),
       row(tr('Контур при наведении'), 's-hover', msCtl('s-hover', 'hover', 1000, 50, function () { document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms'); }),
