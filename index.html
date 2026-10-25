@@ -301,6 +301,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .ev.done { opacity: .5; }
 .ev.done .ev-title { text-decoration: line-through; }
 .ev-dur { display: block; font-size: 13px; font-weight: 700; color: var(--accent); filter: brightness(2); font-variant-numeric: tabular-nums; }
+.ev:not(.ghost) .ev-dur { color: inherit; filter: none; font-size: 12px; }
 .ev.short .ev-dur { display: inline; flex: none; margin-right: 6px; }
 .ev-time { display: block; font-size: 11px; opacity: .85; font-variant-numeric: tabular-nums; }
 .ev-title { font-weight: 600; overflow-wrap: anywhere; }
@@ -3035,6 +3036,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   function evNode(t, lane, lanes, cols, keys, off, span, big) {
     var node = el('div', { class: 'ev' + (isDone(t) ? ' done' : '') + (t.kind === 'routine' ? ' routine' : ''), data: { a: t.area, id: t.id }, tabindex: '0', title: t.title });
     var lb = labelBars(t); if (lb) node.appendChild(lb);
+    node.appendChild(el('span', { class: 'ev-dur' }));
     node.appendChild(el('span', { class: 'ev-time' }));
     var row = el('span', { class: 'ev-row' }, stBtn(t), el('span', { class: 'ev-title', text: (t.priority ? 'P' + t.priority + ' · ' : '') + t.title }));
     (t.icons || []).forEach(function (ic) { row.appendChild(el('span', { class: 'ic-badge', text: ic })); });
