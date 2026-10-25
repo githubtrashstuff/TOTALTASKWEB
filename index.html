@@ -295,12 +295,17 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .tg-gutter { position: relative; }
 .tg-gutter span { top: calc(var(--m, 0) * var(--ppm, 1) * 1px); position: absolute; right: 6px; font-size: 11px; color: var(--muted); transform: translateY(-50%); font-variant-numeric: tabular-nums; }
 .tg-col { position: relative; border-left: 1px solid var(--line); min-width: 0;
-  background-image: repeating-linear-gradient(to bottom, var(--line) 0, var(--line) 1px, transparent 1px, transparent var(--hr, 60px)),
-    repeating-linear-gradient(to bottom, color-mix(in srgb, var(--line) 50%, transparent) 0, color-mix(in srgb, var(--line) 50%, transparent) 1px, transparent 1px, transparent var(--mi, 100000px)); }
-.zone { position: absolute; left: 0; right: 0; pointer-events: none; z-index: 0; }
-.zone.night { background: rgb(var(--night-rgb) / var(--night-a, .42)); }
-.zone.work { background: rgb(var(--work-rgb) / var(--work-a, .3)); }
-.zone.dinner { background: rgb(var(--dinner-rgb) / var(--dinner-a, .3)); }
+  /* цветные полосы времени, часовые и минутные линии одним фоном: масштаб меняет только CSS-переменные */
+  background-image:
+    linear-gradient(rgb(var(--night-rgb) / var(--night-a, .42)), rgb(var(--night-rgb) / var(--night-a, .42))),
+    linear-gradient(rgb(var(--night-rgb) / var(--night-a, .42)), rgb(var(--night-rgb) / var(--night-a, .42))),
+    linear-gradient(rgb(var(--work-rgb) / var(--work-a, .3)), rgb(var(--work-rgb) / var(--work-a, .3))),
+    linear-gradient(rgb(var(--dinner-rgb) / var(--dinner-a, .3)), rgb(var(--dinner-rgb) / var(--dinner-a, .3))),
+    linear-gradient(to bottom, var(--line) 0, var(--line) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--line) 50%, transparent) 0, color-mix(in srgb, var(--line) 50%, transparent) 1px, transparent 1px);
+  background-size: 100% calc(420 * var(--ppm, 1) * 1px), 100% calc(60 * var(--ppm, 1) * 1px), 100% calc(360 * var(--ppm, 1) * 1px), 100% calc(120 * var(--ppm, 1) * 1px), 100% var(--hr, 60px), 100% var(--mi, 100000px);
+  background-position: 0 0, 0 calc(1380 * var(--ppm, 1) * 1px), 0 calc(600 * var(--ppm, 1) * 1px), 0 calc(1140 * var(--ppm, 1) * 1px), 0 0, 0 0;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat-y, repeat-y; }
 .now { position: absolute; left: 0; right: 0; height: 2px; background: var(--accent); z-index: 3; pointer-events: none; }
 .now::before { content: ""; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .ev { position: absolute; z-index: 2; border: 1px solid var(--line); border-left: 3px solid var(--afg, var(--muted)); border-radius: 6px;
@@ -2177,6 +2182,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (sc && PPM < minPPM() - 1e-6) { applyZoom(minPPM()); gridScroll = 0; }
     if (sc && sc.classList.contains('inf')) { if (!infRestore(infPrev, sc)) infCenterNow(sc); }
     else if (sc) { sc.scrollTop = gridScroll; sc.addEventListener('scroll', function () { if (sc.isConnected) gridScroll = sc.scrollTop; }); }
+    if (sc) refreshLabels(sc);
     root.querySelectorAll('.ev').forEach(fitDesc);
     var introPlayed = false;
     var loadingAny = Object.keys(files).some(function (k) { return files[k].state === 'loading'; });
@@ -2870,11 +2876,24 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   function fillGutter(gut, tg) {
     var step = pickStep(PPM);
     tg.style.setProperty('--mi', step < 60 ? (step * PPM) + 'px' : '100000px');
-    gut.style.setProperty('--ppm', PPM);   // позиции подписей считаются в CSS: calc(var(--m) * var(--ppm))
-    if (gut._step === step) return;
-    gut._step = step; gut.textContent = '';
-    for (var m = step; m < 1440; m += step) { var sp = el('span', { text: hhmm(m) }); sp.style.setProperty('--m', m); gut.appendChild(sp); }
+    tg.style.setProperty('--ppm', PPM);    // позиции подписей, линии и полосы времени считаются в CSS от --ppm
+    if (gut._step !== step) { gut._step = step; gut.textContent = ''; gut._lo = gut._hi = null; }
   }
+  // подписи минут создаются только для видимого окна (с запасом в один экран), а не все 1439
+  function refreshLabels(tg) {
+    var step = pickStep(PPM), t = tg.getBoundingClientRect();
+    tg.querySelectorAll('.tg-gutter').forEach(function (g) {
+      var r = g.getBoundingClientRect();
+      if (r.bottom < t.top - 100 || r.top > t.bottom + 100) { if (g.firstChild) g.textContent = ''; g._lo = g._hi = null; return; }
+      var vlo = (t.top - r.top) / PPM, vhi = (t.bottom - r.top) / PPM;
+      if (g._step === step && g._lo != null && g._lo <= vlo && g._hi >= vhi) return;
+      var pad = (t.height / PPM), lo = Math.max(0, Math.floor((vlo - pad) / step) * step), hi = Math.min(1440, vhi + pad);
+      g._step = step; g._lo = lo; g._hi = hi; g.textContent = '';
+      for (var m = Math.max(step, lo); m < hi && m < 1440; m += step) { var sp = el('span', { text: hhmm(m) }); sp.style.setProperty('--m', m); g.appendChild(sp); }
+    });
+  }
+  var labelRaf = 0;
+  function labelWatch() { if (labelRaf) return; labelRaf = requestAnimationFrame(function () { labelRaf = 0; var tg = document.querySelector('.tg'); if (tg) refreshLabels(tg); }); }
   // минимальный масштаб: сутки ровно во всю высоту области сетки
   function minPPM() {
     var tg = document.querySelector('.tg'); if (!tg) return 0.4;
@@ -2894,7 +2913,6 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       n.style.top = (n._s * ppm) + 'px'; n.style.height = h + 'px';
       n.classList.toggle('short', h < 36); n.classList.toggle('tiny', h < 64);
     });
-    tg.querySelectorAll('.zone').forEach(function (z) { if (z._r) { z.style.top = (z._r[0] * ppm) + 'px'; z.style.height = ((z._r[1] - z._r[0]) * ppm) + 'px'; } });
     tg.querySelectorAll('.now').forEach(function (n) { n.style.top = (nowMin() * ppm) + 'px'; });
   }
   var zoom = { target: 1, raf: 0, am: 0, yy: 0, last: 0 };
@@ -2902,6 +2920,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var tg = document.querySelector('.tg'); if (!tg) return;
     tg.scrollTop = zoom.A * PPM + zoom.B;   // положение прокрутки как линейная функция масштаба
     gridScroll = tg.scrollTop;
+    refreshLabels(tg);
   }
   function zoomDone() {
     zoom.raf = 0; zoom.atMin = Math.abs(PPM - minPPM()) < 0.0005; ui.ppm = PPM; lsSet(UI_KEY, ui);
@@ -3135,12 +3154,6 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   }
   // события колонки-дня: пролёты, события, линия «сейчас», приём переноса и создание протяжкой
   function setupCol(col, key, ci, cols, keys, items) {
-      // цветные полосы времени (только фон): сон 23–7, работа 10–16, ужин 19–21
-      [[0, 420, 'night'], [1380, 1440, 'night'], [600, 960, 'work'], [1140, 1260, 'dinner']].forEach(function (r) {
-        var nz = el('div', { class: 'zone ' + r[2], 'aria-hidden': 'true' });
-        nz._r = [r[0], r[1]]; nz.style.top = (r[0] * PPM) + 'px'; nz.style.height = ((r[1] - r[0]) * PPM) + 'px';
-        col.appendChild(nz);
-      });
       lanesFor(items.filter(function (t) { return t.date === key && t.start != null; }))
         .forEach(function (r) { var n = evNode(r.t, r.lane, r.lanes, cols, keys, r.off, r.span, r.big); col.appendChild(n); });
       if (key === todayISO) col.appendChild(el('div', { class: 'now', style: 'top:' + (nowMin() * PPM) + 'px' }));
@@ -3191,6 +3204,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       });
     }
   function scrollerEvents(scroller) {
+    scroller.addEventListener('scroll', labelWatch);
     scroller.addEventListener('contextmenu', function (e) { if (!e.target.closest('.ev, .chip')) e.preventDefault(); });
     scroller.addEventListener('mousedown', function (e) { if (e.button === 1) e.preventDefault(); });
     scroller.addEventListener('pointerdown', function (e) {
