@@ -162,6 +162,9 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .ev.has-cc.dragging-ev { box-shadow: inset 0 1px 0 rgb(255 255 255 / .38), inset 0 -2px 5px rgb(0 0 0 / .2), 0 10px 22px rgb(0 0 0 / .35); }
 .card.preset { background: var(--surface); border: 2px solid var(--cc, var(--line)); padding: 9px 11px; cursor: grab; }
 .card.preset .dur { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.col-mini { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--col); color: var(--fg);
+  font-family: var(--font-display); font-weight: 700; font-size: 15px; }
+.col-mini:hover { background: var(--surface); outline: 2px solid var(--accent); }
 .col.routines { background: var(--surface); border: 1px dashed var(--line); }
 .col.routines .col-name { flex: 1; margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 15px; padding: 4px 6px; }
 .ev.has-pc, .chip.has-pc { background: var(--col); color: var(--fg); border: 2px solid var(--cc); border-left: 2px solid var(--cc); opacity: 1; --abg: var(--col); --afg: var(--fg); }
@@ -621,7 +624,9 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Ужин": "Dinner",
     "Душ": "Shower",
     "Дорога": "Commute",
-    "Зарядка": "Exercise"
+    "Зарядка": "Exercise",
+    "Свернуть": "Collapse",
+    "Развернуть": "Expand"
    },
    "de": {
     "Бэклог": "Backlog",
@@ -845,7 +850,9 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Ужин": "Abendessen",
     "Душ": "Dusche",
     "Дорога": "Fahrt",
-    "Зарядка": "Sport"
+    "Зарядка": "Sport",
+    "Свернуть": "Einklappen",
+    "Развернуть": "Ausklappen"
    },
    "zh": {
     "Бэклог": "待办",
@@ -1069,7 +1076,9 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Ужин": "晚餐",
     "Душ": "洗澡",
     "Дорога": "通勤",
-    "Зарядка": "锻炼"
+    "Зарядка": "锻炼",
+    "Свернуть": "折叠",
+    "Развернуть": "展开"
    }
   };
   var LANGS = [['en', 'English'], ['ru', 'Русский'], ['de', 'Deutsch'], ['zh', '中文']];
@@ -1718,13 +1727,32 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     attachDrag(c, p.id);
     return c;
   }
+  function isCollapsed(key) { return !!(ui.collapsed && ui.collapsed[key]); }
+  function toggleCol(key) {
+    ui.collapsed = ui.collapsed || {};
+    if (ui.collapsed[key]) delete ui.collapsed[key]; else ui.collapsed[key] = true;
+    lsSet(UI_KEY, ui); sfx('tick'); render();
+  }
+  function foldBtn(key) {
+    var b = el('button', { class: 'icon-btn', title: tr('Свернуть'), 'aria-label': tr('Свернуть'), text: '‹' });
+    b.addEventListener('click', function () { toggleCol(key); });
+    return b;
+  }
+  // свёрнутая колонка: кнопка с первой буквой названия
+  function miniCol(title, key) {
+    var letter = (Array.from(title.trim())[0] || '?').toUpperCase();
+    var b = el('button', { class: 'col-mini', text: letter, title: title + ' · ' + tr('Развернуть'), 'aria-label': tr('Развернуть') + ': ' + title });
+    b.addEventListener('click', function () { toggleCol(key); });
+    return b;
+  }
   function routinesColumn() {
+    if (isCollapsed('routines')) return miniCol(tr('Рутины'), 'routines');
     var list = el('div', { class: 'cards' });
     presets().forEach(function (p) { list.appendChild(presetCard(p)); });
     var addBtn = el('button', { class: 'add-card', text: tr('+ Рутина') });
     addBtn.addEventListener('click', function () { inlineInput(addBtn, tr('Название рутины'), function (v) { commitPreset(newPreset(v, 30)); }); });
     return el('section', { class: 'col routines' },
-      el('div', { class: 'col-head' }, el('h3', { class: 'col-name', text: '↻ ' + tr('Рутины') }), el('span', { class: 'count', text: String(list.children.length) })),
+      el('div', { class: 'col-head' }, el('h3', { class: 'col-name', text: '↻ ' + tr('Рутины') }), el('span', { class: 'count', text: String(list.children.length) }), foldBtn('routines')),
       list, addBtn);
   }
   function presetModal(p) {
@@ -2325,6 +2353,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     boardEl.appendChild(routinesColumn());
     var cols = columns();
     cols.forEach(function (col, ci) {
+      if (isCollapsed(col.id)) { boardEl.appendChild(miniCol(col.title, col.id)); return; }
       var inCol = tasks.filter(function (t) { return colOf(t).id === col.id; })
         .sort(function (a, b) { return (a.order || 0) - (b.order || 0) || (a.date || '').localeCompare(b.date || ''); });
       var shown = inCol.filter(matches);
@@ -2363,7 +2392,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
         inlineInput(addBtn, tr('Название задачи'), function (v) { commitTask(newDraft({ title: v, status: col.id })); });
       });
       boardEl.appendChild(el('section', { class: 'col' },
-        el('div', { class: 'col-head' }, title, el('span', { class: 'count', text: String(shown.length) }), del), list, addBtn));
+        el('div', { class: 'col-head' }, title, el('span', { class: 'count', text: String(shown.length) }), foldBtn(col.id), del), list, addBtn));
     });
     var ab = el('button', { class: 'add-card', text: tr('+ Колонка') });
     ab.addEventListener('click', function () {
