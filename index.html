@@ -162,6 +162,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .ev.has-cc.dragging-ev { box-shadow: inset 0 1px 0 rgb(255 255 255 / .38), inset 0 -2px 5px rgb(0 0 0 / .2), 0 10px 22px rgb(0 0 0 / .35); }
 .card.preset { background: var(--surface); border: 2px solid var(--cc, var(--line)); padding: 9px 11px; cursor: grab; }
 .card.preset .dur { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.fold-btn { min-width: 34px; height: 34px; border-radius: 9px; font-size: 24px; font-weight: 600; line-height: 1; color: var(--fg); background: var(--surface); border: 1px solid var(--line); }
+.fold-btn:hover { outline: 2px solid var(--accent); }
 .col-mini { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--col); color: var(--fg);
   font-family: var(--font-display); font-weight: 700; font-size: 15px; }
 .col-mini:hover { background: var(--surface); outline: 2px solid var(--accent); }
@@ -1734,16 +1736,44 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     lsSet(UI_KEY, ui); sfx('tick'); render();
   }
   function foldBtn(key) {
-    var b = el('button', { class: 'icon-btn', title: tr('Свернуть'), 'aria-label': tr('Свернуть'), text: '‹' });
+    var b = el('button', { class: 'icon-btn fold-btn', title: tr('Свернуть'), 'aria-label': tr('Свернуть'), text: '‹' });
     b.addEventListener('click', function () { toggleCol(key); });
     return b;
   }
   // свёрнутая колонка: кнопка с первой буквой названия
-  function miniCol(title, key) {
+  function miniCol(title, key, deletable) {
     var letter = (Array.from(title.trim())[0] || '?').toUpperCase();
     var b = el('button', { class: 'col-mini', text: letter, title: title + ' · ' + tr('Развернуть'), 'aria-label': tr('Развернуть') + ': ' + title });
     b.addEventListener('click', function () { toggleCol(key); });
+    b.addEventListener('contextmenu', function (e) { colMenu(e, key, title, true); });
     return b;
+  }
+  function deleteColumn(id) {
+    var cols = columns(), col = colById(id); if (!col || cols.length < 2) return;
+    var first = cols.filter(function (c) { return c.id !== id; })[0].id;
+    all().filter(function (t) { return t.status === id; }).forEach(function (t) { var d = clone(t); d.status = first; commitTask(d); });
+    boardAction('удалена колонка «' + col.title + '»', { act: 'remove', id: id });
+  }
+  // меню правого клика по колонке: свернуть / развернуть и удалить
+  function colMenu(e, key, title, folded) {
+    e.preventDefault(); e.stopPropagation();
+    closeCtx(); sfx('menu');
+    var menu = ctxEl = el('div', { class: 'ctx', role: 'menu' });
+    function item(label, fn, cls) { var b = el('button', { type: 'button', class: 'ctx-item' + (cls ? ' ' + cls : ''), role: 'menuitem' }, el('span', { text: label })); b.addEventListener('click', function () { fn(b); }); menu.appendChild(b); }
+    item(isCollapsed(key) ? tr('Развернуть') : tr('Свернуть'), function () { closeCtx(); toggleCol(key); });
+    if (key !== 'routines' && columns().length > 1) item(tr('Удалить колонку'), function (b) { arm(b, 'colctx' + key, tr('Точно удалить?'), function () { closeCtx(); deleteColumn(key); }); }, 'danger');
+    document.body.appendChild(menu);
+    var w = menu.offsetWidth, h = menu.offsetHeight;
+    menu.style.left = Math.max(8, Math.min(e.clientX, innerWidth - w - 8)) + 'px';
+    menu.style.top = Math.max(8, Math.min(e.clientY, innerHeight - h - 8)) + 'px';
+    function down(ev) { if (!menu.contains(ev.target)) closeCtx(); }
+    function k(ev) { if (ev.key === 'Escape') { ev.stopPropagation(); closeCtx(); } }
+    window.addEventListener('pointerdown', down, true); window.addEventListener('keydown', k, true);
+    window.addEventListener('blur', closeCtx); window.addEventListener('resize', closeCtx);
+    ctxOff = function () {
+      window.removeEventListener('pointerdown', down, true); window.removeEventListener('keydown', k, true);
+      window.removeEventListener('blur', closeCtx); window.removeEventListener('resize', closeCtx);
+    };
   }
   function routinesColumn() {
     if (isCollapsed('routines')) return miniCol(tr('Рутины'), 'routines');
@@ -1751,9 +1781,11 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     presets().forEach(function (p) { list.appendChild(presetCard(p)); });
     var addBtn = el('button', { class: 'add-card', text: tr('+ Рутина') });
     addBtn.addEventListener('click', function () { inlineInput(addBtn, tr('Название рутины'), function (v) { commitPreset(newPreset(v, 30)); }); });
-    return el('section', { class: 'col routines' },
+    var rsec = el('section', { class: 'col routines' },
       el('div', { class: 'col-head' }, el('h3', { class: 'col-name', text: '↻ ' + tr('Рутины') }), el('span', { class: 'count', text: String(list.children.length) }), foldBtn('routines')),
       list, addBtn);
+    rsec.addEventListener('contextmenu', function (e) { colMenu(e, 'routines', tr('Рутины')); });
+    return rsec;
   }
   function presetModal(p) {
     var d = clone(p);
@@ -2353,7 +2385,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     boardEl.appendChild(routinesColumn());
     var cols = columns();
     cols.forEach(function (col, ci) {
-      if (isCollapsed(col.id)) { boardEl.appendChild(miniCol(col.title, col.id)); return; }
+      if (isCollapsed(col.id)) { boardEl.appendChild(miniCol(col.title, col.id, true)); return; }
       var inCol = tasks.filter(function (t) { return colOf(t).id === col.id; })
         .sort(function (a, b) { return (a.order || 0) - (b.order || 0) || (a.date || '').localeCompare(b.date || ''); });
       var shown = inCol.filter(matches);
@@ -2365,15 +2397,6 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       });
       title.addEventListener('keydown', function (e) { if (e.key === 'Enter') title.blur(); });
       title.addEventListener('blur', function () { if (needRender) setTimeout(softRender, 0); });
-      var del = el('button', { class: 'icon-btn', title: tr('Удалить колонку'), 'aria-label': tr('Удалить колонку'), text: '×' });
-      del.addEventListener('click', function () {
-        if (cols.length < 2) return;
-        arm(del, 'col' + col.id, tr('Удалить?'), function () {
-          var id = col.id, first = cols[ci === 0 ? 1 : 0].id;
-          all().filter(function (t) { return t.status === id; }).forEach(function (t) { var d = clone(t); d.status = first; commitTask(d); });
-          boardAction('удалена колонка «' + col.title + '»', { act: 'remove', id: id });
-        });
-      });
       var list = el('div', { class: 'cards' });
       shown.forEach(function (t) { list.appendChild(cardNode(t)); });
       setDrop(list, function (id, before) {
@@ -2391,8 +2414,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       addBtn.addEventListener('click', function () {
         inlineInput(addBtn, tr('Название задачи'), function (v) { commitTask(newDraft({ title: v, status: col.id })); });
       });
-      boardEl.appendChild(el('section', { class: 'col' },
-        el('div', { class: 'col-head' }, title, el('span', { class: 'count', text: String(shown.length) }), foldBtn(col.id), del), list, addBtn));
+      var section = el('section', { class: 'col' },
+        el('div', { class: 'col-head' }, title, el('span', { class: 'count', text: String(shown.length) }), foldBtn(col.id)), list, addBtn);
+      section.addEventListener('contextmenu', function (e) { colMenu(e, col.id, col.title); });
+      boardEl.appendChild(section);
     });
     var ab = el('button', { class: 'add-card', text: tr('+ Колонка') });
     ab.addEventListener('click', function () {
