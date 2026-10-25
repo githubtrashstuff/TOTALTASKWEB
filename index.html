@@ -113,6 +113,8 @@ main { padding-top: 14px; }
 .ph { flex: none; border-radius: 10px; background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); overflow: hidden;
   transition: height .22s cubic-bezier(.2,.8,.2,1), margin-top .22s cubic-bezier(.2,.8,.2,1), opacity .18s; }
 .drag-wrap { position: fixed; left: 0; top: 0; z-index: 100; pointer-events: none; will-change: transform; }
+.drag-wrap.cloning::after { content: "+"; position: absolute; right: -8px; top: -8px; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: var(--accent-ink);
+  display: grid; place-items: center; font-weight: 700; font-size: 14px; line-height: 1; box-shadow: 0 2px 6px rgb(0 0 0 / .3); }
 .drag-wrap > * { margin: 0; width: 100%; height: 100%; box-sizing: border-box; border-color: var(--accent); cursor: grabbing;
   box-shadow: 0 14px 30px rgb(0 0 0 / .26), 0 2px 6px rgb(0 0 0 / .18); transform-origin: var(--gx, 50%) var(--gy, 50%);
   transition: scale .18s cubic-bezier(.2,.8,.2,1), opacity .14s; }
@@ -1604,29 +1606,37 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     function pre(ev) {
       if (ev.pointerId !== pid) return;
       var dist = Math.hypot(ev.clientX - x0, ev.clientY - y0);
-      if (touch) { if (dist > 8) off(); } else if (dist > 4) { off(); dragStart(node, id, ev.clientX, ev.clientY, pid); }
+      if (touch) { if (dist > 8) off(); } else if (dist > 4) { off(); dragStart(node, id, ev.clientX, ev.clientY, pid, e.altKey); }
     }
     window.addEventListener('pointermove', pre); window.addEventListener('pointerup', off); window.addEventListener('pointercancel', off);
-    if (touch) timer = setTimeout(function () { off(); dragStart(node, id, x0, y0, pid); }, 260);
+    if (touch) timer = setTimeout(function () { off(); dragStart(node, id, x0, y0, pid, false); }, 260);
   }
-  function dragStart(node, id, x, y, pid) {
+  function dupTask(id) {
+    var t = draftOf(id); if (!t) return null;
+    t.id = uid(); t.created = new Date().toISOString(); t.order = (t.order || 0) + 1;
+    delete t.carriedFrom; delete t.aiNote; delete t.pinned;
+    commitTask(t);
+    return t.id;
+  }
+  function dragStart(node, id, x, y, pid, alt) {
     var d0 = draftOf(id); if (!d0 || !node.isConnected) return;
     try { node.releasePointerCapture(pid); } catch (e) {}
     var r = node.getBoundingClientRect(), isCard = node.classList.contains('card');
     var S = drag = { id: id, node: node, d0: d0, isCard: isCard, h: isCard ? r.height : 52, gx: x - r.left, gy: y - r.top, x: x, y: y, lx: x, tt: 0,
-      px: r.left, py: r.top, tgt: null, ph: null, phList: null, phRef: null, pv: null, pvStart: 0, ctrl: false, t: performance.now(), done: false };
+      px: r.left, py: r.top, tgt: null, ph: null, phList: null, phRef: null, pv: null, pvStart: 0, ctrl: false, t: performance.now(), done: false, cp: !!alt };
     S.dur = d0.start != null ? endOf(d0) - d0.start : (d0.estimate || 60);
     dragId = id;
     document.body.classList.add('is-dragging');
     var inner = node.cloneNode(true);
     inner.removeAttribute('title'); inner.classList.remove('dragging');
     inner.style.setProperty('--gx', S.gx + 'px'); inner.style.setProperty('--gy', S.gy + 'px');
-    var wrap = el('div', { class: 'drag-wrap' }, inner);
+    var wrap = el('div', { class: 'drag-wrap' + (S.cp ? ' cloning' : '') }, inner);
     wrap.style.width = r.width + 'px'; wrap.style.height = r.height + 'px';
     document.body.appendChild(wrap);
     S.wrap = wrap; S.inner = inner;
     requestAnimationFrame(function () { inner.style.scale = '1.04'; });
-    if (isCard) {
+    if (S.cp) { /* копия: оригинал остаётся на месте */ }
+    else if (isCard) {
       var list = node.parentNode;
       S.homeList = list;
       var p = makePh(); list.insertBefore(p, node); openPh(p, S.h, true);
@@ -1678,7 +1688,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   }
   function nextCard(ph) {
     var n = ph.nextElementSibling;
-    while (n && !(n.classList.contains('card') && n !== drag.node)) n = n.nextElementSibling;
+    while (n && !(n.classList.contains('card') && (drag.cp || n !== drag.node))) n = n.nextElementSibling;
     return n;
   }
   function placeAt(S, list, ref) {
@@ -1695,7 +1705,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     for (var i = 0; i < kids.length; i++) {
       var c = kids[i];
       if (c.classList.contains('ph')) acc += c.getBoundingClientRect().height + parseFloat(getComputedStyle(c).marginTop) + 8;
-      else if (c.classList.contains('card') && c !== S.node) {
+      else if (c.classList.contains('card') && (S.cp || c !== S.node)) {
         var r = c.getBoundingClientRect();
         if (S.y > r.top - acc + r.height / 2) idx++;
         cards.push(c);
@@ -1796,7 +1806,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     window.removeEventListener('keydown', S.key, true); window.removeEventListener('touchmove', S.tm); window.removeEventListener('contextmenu', S.cm);
     setTimeout(function () { window.removeEventListener('click', S.swallow, true); }, 80);
     var t = S.tgt;
-    if (commit && t && t.kind === 'list' && S.isCard && S.phList === S.homeList && S.phRef === S.homeRef) commit = false;
+    if (commit && t && t.kind === 'list' && S.isCard && !S.cp && S.phList === S.homeList && S.phRef === S.homeRef) commit = false;
     function close(commitFn, fade) {
       drag = null; dragId = null; document.body.classList.remove('is-dragging');
       if (commitFn) { commitFn(); if (S.node.isConnected) render(); }
@@ -1811,16 +1821,16 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (commit && t) {
       var dz = t.node._dz;
       if (t.kind === 'list') flyTo(S, function () { return S.ph.getBoundingClientRect(); }, function () {
-        var before = nextCard(S.ph); close(function () { dz.drop(S.id, before); }, false);
+        var before = nextCard(S.ph); close(function () { var nid = S.cp ? dupTask(S.id) : S.id; if (nid) dz.drop(nid, before); }, false);
       });
       else {
         var pvEl = S.pv && S.pv.el, rectOf = function () { return pvEl.getBoundingClientRect(); };
-        var go = t.kind === 'ev' ? function () { dz.drop(S.id, S.pvStart); } : function () { dz.drop(S.id); };
+        var go = function () { var nid = S.cp ? dupTask(S.id) : S.id; if (nid) { if (t.kind === 'ev') dz.drop(nid, S.pvStart); else dz.drop(nid); } };
         if (pvEl) flyInto(S, rectOf, function () { close(go, false); }); else close(go, true);
       }
       return;
     }
-    if (S.isCard) {
+    if (S.isCard && !S.cp) {
       releaseList(S); S.inner.style.opacity = '1';
       var home = S.homeList; placeAt(S, home, S.homeRef && S.homeRef.parentNode === home ? S.homeRef : null);
       flyTo(S, function () { return S.ph.getBoundingClientRect(); }, function () { close(null, false); });
@@ -2233,13 +2243,13 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (e.button !== 0) return;
     e.preventDefault(); e.stopPropagation();
     interacting = true;
-    var s0 = t.start, e0 = endOf(t), dur = e0 - s0, x0 = e.clientX, y0 = e.clientY, moved = false;
+    var s0 = t.start, e0 = endOf(t), dur = e0 - s0, x0 = e.clientX, y0 = e.clientY, moved = false, alt = e.altKey && mode === 'move', stay = null;
     var cur = { s: s0, e: e0, i: cols.indexOf(node.parentNode) };
     var grab = minAt(node.parentNode, e.clientY) - s0;
     function colIndexAt(x) { for (var i = 0; i < cols.length; i++) if (x < cols[i].getBoundingClientRect().right) return i; return cols.length - 1; }
     function stop() { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); window.removeEventListener('pointercancel', onCancel); }
     function onMove(ev) {
-      if (!moved) { if (Math.abs(ev.clientX - x0) + Math.abs(ev.clientY - y0) < 4) return; moved = true; node.classList.add('dragging-ev'); }
+      if (!moved) { if (Math.abs(ev.clientX - x0) + Math.abs(ev.clientY - y0) < 4) return; moved = true; if (alt) { stay = node.cloneNode(true); stay.style.pointerEvents = 'none'; node.parentNode.insertBefore(stay, node); } node.classList.add('dragging-ev'); }
       var ci = mode === 'move' ? colIndexAt(ev.clientX) : cur.i;
       var colEl = cols[ci], m = minAt(colEl, ev.clientY), s = cur.s, en = cur.e;
       if (mode === 'move') {
@@ -2261,6 +2271,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       stop(); interacting = false;
       if (!moved) { needRender = false; openTask(t.id); return; }
       var d = draftOf(t.id); if (!d) { render(); return; }
+      if (alt) { d.id = uid(); d.created = new Date().toISOString(); d.order = (d.order || 0) + 1; delete d.carriedFrom; delete d.aiNote; delete d.pinned; }
       d.start = cur.s; d.end = cur.e; d.date = keys[cur.i]; commitTask(d);
     }
     function onCancel() { stop(); interacting = false; render(); }
