@@ -1473,7 +1473,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   /* ---------- состояние ---------- */
   var cfg = lsGet(CFG_KEY);
   var ui = lsGet(UI_KEY) || {};
-  PPM = clamp(+ui.ppm || 1, 0.4, 16);
+  PPM = clamp(+ui.ppm || 1, 0.4, 64);
   var DEFAULT_SETTINGS = { entrance: 'pop', entranceMs: 900, popScale: 25, popRot: 40, popMove: 40, calW: 50, calWF: 33, zoomMs: 160, tNight: 58, tWork: 70, tDinner: 70, placeFx: 'pop', sound: true, volume: 50, hoverVol: 25, hoverShift: 0, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
     lang: 'en', device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'phone' : 'computer' };
   var settings = Object.assign({}, DEFAULT_SETTINGS, ui.settings || {});
@@ -2887,7 +2887,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (sscroll.raf) { cancelAnimationFrame(sscroll.raf); sscroll.raf = 0; }
     zoom.yy = clientY - r.top;
     zoom.am = (tg.scrollTop + zoom.yy - (top ? top.offsetHeight : 0)) / PPM;
-    zoom.target = clamp((zoom.raf ? zoom.target : PPM) * Math.exp(-dy * 0.0045), 0.4, 16);
+    zoom.target = clamp((zoom.raf ? zoom.target : PPM) * Math.exp(-dy * 0.0045), 0.4, 64);
     sfx('slot');
     if (settings.zoomMs <= 0) { applyZoom(zoom.target); zoomAnchor(); zoomDone(); return; }
     if (!zoom.raf) { zoom.last = performance.now(); zoom.raf = requestAnimationFrame(zoomTick); }
