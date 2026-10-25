@@ -2197,7 +2197,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       node.classList.add('drag-src');
       S.ph = p; S.phList = list; S.phRef = S.homeRef = nextCard(p);
     } else node.classList.add('drag-src');
-    S.mv = function (ev) { if (ev.pointerId !== pid && ev.pointerType !== 'mouse') return; S.tt = clamp((ev.clientX - S.lx) * 0.9, -8, 8); S.lx = ev.clientX; S.x = ev.clientX; S.y = ev.clientY; S.ctrl = ev.ctrlKey; };
+    S.mv = function (ev) { if (ev.pointerId !== pid && ev.pointerType !== 'mouse') return; S.x = ev.clientX; S.y = ev.clientY; S.ctrl = ev.ctrlKey; };
     S.up = function () { finish(true); };
     S.cancel = function () { finish(false); };
     S.key = function (ev) { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); finish(false); } };
@@ -2215,9 +2215,14 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   }
   function dragTick(now) {
     var S = drag; if (!S || S.done) return;
-    S.t = now; S.tt *= 0.88;
+    var dt = Math.min(now - (S.lt || now), 50) || 16; S.lt = now; S.t = now;
     dragScroll(S);
-    S.px = S.x - S.gx; S.py = S.y - S.gy; placeClone(S);
+    // мягкое следование за курсором и плавный наклон по скорости
+    var k = 1 - Math.exp(-dt / 40), ox = S.px;
+    S.px += (S.x - S.gx - S.px) * k; S.py += (S.y - S.gy - S.py) * k;
+    var target = clamp((S.px - ox) / dt * 16 * 0.3, -3.5, 3.5);
+    S.tt += (target - S.tt) * (1 - Math.exp(-dt / 90));
+    placeClone(S);
     dragUpdate(S);
     S.raf = requestAnimationFrame(dragTick);
   }
