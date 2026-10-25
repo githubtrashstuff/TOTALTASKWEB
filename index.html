@@ -2582,7 +2582,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var fake = null;
     if (extra) { fake = { id: extra.id, start: extra.s, end: extra.e }; items.push(fake); }
     lanesFor(items).forEach(function (r) {
-      var n = r.t === fake ? extra.node : colEl.querySelector('.ev[data-id="' + r.t.id + '"]');
+      if (r.t === fake) return; // переносимый блок остаётся как есть, подстраиваются только соседи
+      var n = colEl.querySelector('.ev[data-id="' + r.t.id + '"]');
       if (!n) return;
       var off = r.off || 0, span = r.span || 1;
       n.style.left = 'calc(' + (off * 100 + r.lane * span * 100 / r.lanes) + '% + 1px)';
