@@ -2336,7 +2336,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       window.removeEventListener('pointerdown', outside, true);
       var v = inp.value.trim();
       ghost.remove(); interacting = false;
-      if (commit && v) commitTask(newDraft({ title: v, date: key, start: a, end: b }));
+      if (commit) commitTask(newDraft({ title: v || 'empty', date: key, start: a, end: b }));
       else if (needRender) render();
     }
     inp.addEventListener('keydown', function (e) {
