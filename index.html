@@ -519,7 +519,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Язык": "Language",
     "Колесо мыши в календаре": "Mouse wheel in the calendar",
     "Масштаб времени (Alt — прокрутка)": "Time zoom (Alt = scroll)",
-    "Прокрутка (Ctrl — масштаб)": "Scroll (Ctrl = zoom)",
+    "Прокрутка (Alt — масштаб)": "Scroll (Alt = zoom)",
     "Масштаб растягивает сетку дня по вертикали вокруг курсора.": "Zoom stretches the day grid vertically around the cursor.",
     "Слева, канбан справа": "Left, board on the right",
     "Справа, канбан слева": "Right, board on the left",
@@ -725,7 +725,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Язык": "Sprache",
     "Колесо мыши в календаре": "Mausrad im Kalender",
     "Масштаб времени (Alt — прокрутка)": "Zeitzoom (Alt = scrollen)",
-    "Прокрутка (Ctrl — масштаб)": "Scrollen (Strg = Zoom)",
+    "Прокрутка (Alt — масштаб)": "Scrollen (Alt = Zoom)",
     "Масштаб растягивает сетку дня по вертикали вокруг курсора.": "Der Zoom streckt das Tagesraster vertikal um den Mauszeiger.",
     "Слева, канбан справа": "Links, Board rechts",
     "Справа, канбан слева": "Rechts, Board links",
@@ -931,7 +931,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Язык": "语言",
     "Колесо мыши в календаре": "日历中的鼠标滚轮",
     "Масштаб времени (Alt — прокрутка)": "缩放时间（Alt = 滚动）",
-    "Прокрутка (Ctrl — масштаб)": "滚动（Ctrl = 缩放）",
+    "Прокрутка (Alt — масштаб)": "滚动（Alt = 缩放）",
     "Масштаб растягивает сетку дня по вертикали вокруг курсора.": "缩放会以光标为中心纵向拉伸日视图网格。",
     "Слева, канбан справа": "在左侧，看板在右侧",
     "Справа, канбан слева": "在右侧，看板在左侧",
@@ -1192,7 +1192,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   var cfg = lsGet(CFG_KEY);
   var ui = lsGet(UI_KEY) || {};
   PPM = clamp(+ui.ppm || 1, 0.4, 8);
-  var DEFAULT_SETTINGS = { wheelZoom: true, layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
+  var DEFAULT_SETTINGS = { wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
     lang: 'en', device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'phone' : 'computer' };
   var settings = Object.assign({}, DEFAULT_SETTINGS, ui.settings || {});
   document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms');
@@ -2385,7 +2385,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
     });
     scroller.addEventListener('wheel', function (e) {
-      if (!(settings.wheelZoom ? !e.altKey : e.ctrlKey)) return;
+      if (!(settings.wheel === 'zoom' ? !e.altKey : (e.altKey || e.ctrlKey))) return;
       if (interacting || dragId || $('modal-root').firstChild) return;
       e.preventDefault();
       var dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
@@ -2620,8 +2620,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
         if (files[P_BOARD] && !files[P_BOARD].sha) { files[P_BOARD].base = defaultBoard(); recompute(P_BOARD); }
         closeModal(); render(); settingsModal();
       })),
-      row(tr('Колесо мыши в календаре'), 's-wheel', sel('s-wheel', settings.wheelZoom ? '1' : '0', [['1', tr('Масштаб времени (Alt — прокрутка)')], ['0', tr('Прокрутка (Ctrl — масштаб)')]],
-        function (v) { settings.wheelZoom = v === '1'; }), tr('Масштаб растягивает сетку дня по вертикали вокруг курсора.')),
+      row(tr('Колесо мыши в календаре'), 's-wheel', sel('s-wheel', settings.wheel, [['scroll', tr('Прокрутка (Alt — масштаб)')], ['zoom', tr('Масштаб времени (Alt — прокрутка)')]],
+        function (v) { settings.wheel = v; }), tr('Масштаб растягивает сетку дня по вертикали вокруг курсора.')),
       row(tr('Календарь'), 's-layout', sel('s-layout', settings.layout, [['left', tr('Слева, канбан справа')], ['right', tr('Справа, канбан слева')]],
         function (v) { settings.layout = v; $('view').dataset.layout = v; }), tr('Расположение двух частей на широком экране.')),
       row(tr('Скольжение между днями'), 's-slide', msCtl('s-slide', 'slide', 2000, 100),
