@@ -1330,7 +1330,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   function hhmm(m) { return pad(Math.floor(m / 60)) + ':' + pad(m % 60); }
   function toMin(s) { if (!s) return null; var p = s.split(':'); return (+p[0]) * 60 + (+p[1]); }
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
-  function snap(m, ctrl) { return ctrl ? Math.round(m / 10) * 10 : Math.round(m); }
+  // привязка по времени: без клавиш по минутам, Ctrl — 5 минут, Shift — 10 минут (e — событие или объект с ctrlKey/shiftKey)
+  function snap(m, e) { var q = e && e.shiftKey ? 10 : e && e.ctrlKey ? 5 : 1; return Math.round(m / q) * q; }
   function nowMin() { var n = new Date(); return n.getHours() * 60 + n.getMinutes(); }
   function uid() { return 't_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
   function weekId(d) {
@@ -2228,15 +2229,16 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       node.classList.add('drag-src');
       S.ph = p; S.phList = list; S.phRef = S.homeRef = nextCard(p);
     } else node.classList.add('drag-src');
-    S.mv = function (ev) { if (ev.pointerId !== pid && ev.pointerType !== 'mouse') return; S.x = ev.clientX; S.y = ev.clientY; S.ctrl = ev.ctrlKey; };
+    S.mv = function (ev) { if (ev.pointerId !== pid && ev.pointerType !== 'mouse') return; S.x = ev.clientX; S.y = ev.clientY; S.ctrl = ev.ctrlKey; S.shift = ev.shiftKey; };
     S.up = function () { finish(true); };
     S.cancel = function () { finish(false); };
-    S.key = function (ev) { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); finish(false); } };
+    S.key = function (ev) { S.ctrl = ev.ctrlKey; S.shift = ev.shiftKey; if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); finish(false); } };
+    S.keyup = function (ev) { S.ctrl = ev.ctrlKey; S.shift = ev.shiftKey; };
     S.tm = function (ev) { ev.preventDefault(); };
     S.cm = function (ev) { ev.preventDefault(); };
     S.swallow = function (ev) { ev.stopPropagation(); ev.preventDefault(); };
     window.addEventListener('pointermove', S.mv); window.addEventListener('pointerup', S.up); window.addEventListener('pointercancel', S.cancel);
-    window.addEventListener('keydown', S.key, true); window.addEventListener('touchmove', S.tm, { passive: false });
+    window.addEventListener('keydown', S.key, true); window.addEventListener('keyup', S.keyup, true); window.addEventListener('touchmove', S.tm, { passive: false });
     window.addEventListener('contextmenu', S.cm); window.addEventListener('click', S.swallow, true);
     S.raf = requestAnimationFrame(dragTick);
   }
@@ -2322,9 +2324,9 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (t.kind === 'list') { clearPv(S); updateList(S, t.node); S.inner.style.opacity = '1'; return; }
     releaseList(S);
     if (t.kind === 'ev') {
-      var q = S.ctrl || PPM >= 6 ? 1 : 5, m = minAt(t.node, S.y) - Math.min(S.dur / 2, 12);
+      var m = minAt(t.node, S.y) - Math.min(S.dur / 2, 12);
       var dur = clamp(S.dur, 1, 1440);
-      S.pvStart = clamp(Math.round(m / q) * q, 0, 1440 - dur);
+      S.pvStart = clamp(snap(m, { ctrlKey: S.ctrl, shiftKey: S.shift }), 0, 1440 - dur);
       var pv = setPv(S, 'ev', t.node);
       paintEv(pv, S.pvStart, S.pvStart + dur);
       var sig = t.node.dataset.key + ':' + S.pvStart + ':' + dur;
@@ -2400,7 +2402,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var S = drag; if (!S || S.done) return;
     S.done = true; cancelAnimationFrame(S.raf);
     window.removeEventListener('pointermove', S.mv); window.removeEventListener('pointerup', S.up); window.removeEventListener('pointercancel', S.cancel);
-    window.removeEventListener('keydown', S.key, true); window.removeEventListener('touchmove', S.tm); window.removeEventListener('contextmenu', S.cm);
+    window.removeEventListener('keydown', S.key, true); window.removeEventListener('keyup', S.keyup, true); window.removeEventListener('touchmove', S.tm); window.removeEventListener('contextmenu', S.cm);
     setTimeout(function () { window.removeEventListener('click', S.swallow, true); }, 80);
     var t = S.tgt, wasCommit = commit;
     if (commit && t && t.kind === 'list' && S.isCard && !S.cp && S.phList === S.homeList && S.phRef === S.homeRef) commit = false;
@@ -2976,7 +2978,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       var ci = mode === 'move' ? colIndexAt(ev.clientX) : cur.i;
       var colEl = cols[ci], m = minAt(colEl, ev.clientY), s = cur.s, en = cur.e;
       if (mode === 'move') {
-        s = clamp(snap(m - grab, ev.ctrlKey), 0, 1440 - dur); en = s + dur;
+        s = clamp(snap(m - grab, ev), 0, 1440 - dur); en = s + dur;
         if (ci !== cur.i) {
           var first = node.getBoundingClientRect();
           node.getAnimations().forEach(function (a) { a.cancel(); });
@@ -2986,8 +2988,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
           if (settings.slide > 0) node.animate([{ transform: 'translate(' + (first.left - last.left) + 'px,' + (first.top - last.top) + 'px)' }, { transform: 'none' }],
             { duration: settings.slide, easing: 'cubic-bezier(.22,.8,.2,1)' });
         }
-      } else if (mode === 'top') { s = clamp(snap(m, ev.ctrlKey), 0, e0 - 1); en = e0; }
-      else { s = s0; en = clamp(snap(m, ev.ctrlKey), s0 + 1, 1440); }
+      } else if (mode === 'top') { s = clamp(snap(m, ev), 0, e0 - 1); en = e0; }
+      else { s = s0; en = clamp(snap(m, ev), s0 + 1, 1440); }
       cur.s = s; cur.e = en; paintEv(node, s, en);
       var sig = cur.i + ':' + s + ':' + en;
       if (sig !== lastSig) {
@@ -3138,7 +3140,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
         if (inlineCur) inlineCur.finish(true);
         var c = document.querySelectorAll('.tg-col')[ci] || col;
         interacting = true;
-        var startM = clamp(snap(minAt(c, e.clientY), e.ctrlKey), 0, 1439);
+        var startM = clamp(snap(minAt(c, e.clientY), e), 0, 1439);
         var y0 = e.clientY, moved = false, ghost = null, a = startM, b = startM + 1;
         var evTarget = rmb ? e.target.closest('.ev') : null;
         var blockCtx = function (ev) { ev.preventDefault(); ev.stopPropagation(); };
@@ -3152,7 +3154,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
             ghost = el('div', { class: 'ev ghost', style: 'left:1px;width:calc(100% - 6px)' }, el('span', { class: 'ev-dur' }), el('span', { class: 'ev-time' }));
             c.appendChild(ghost);
           }
-          var m = clamp(snap(minAt(c, ev.clientY), ev.ctrlKey), 0, 1440);
+          var m = clamp(snap(minAt(c, ev.clientY), ev), 0, 1440);
           a = Math.min(startM, m); b = Math.max(startM, m); if (b - a < 1) b = a + 1;
           paintEv(ghost, a, b);
         }
