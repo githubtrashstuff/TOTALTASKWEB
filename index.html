@@ -2151,6 +2151,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     root.appendChild(el('section', { class: 'pane pane-board', 'aria-label': tr('Канбан') }, boardEl));
     var b = root.querySelector('.board'); if (b) b.scrollLeft = keepLeft;
     var sc = root.querySelector('.tg');
+    if (sc && PPM < minPPM() - 1e-6) { applyZoom(minPPM()); gridScroll = 0; }
     if (sc) { sc.scrollTop = gridScroll; sc.addEventListener('scroll', function () { if (sc.isConnected) gridScroll = sc.scrollTop; }); }
     root.querySelectorAll('.ev').forEach(fitDesc);
     var introPlayed = false;
@@ -2845,6 +2846,12 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     gut._step = step; gut.textContent = '';
     for (var m = step; m < 1440; m += step) { var sp = el('span', { text: hhmm(m) }); sp._m = m; sp.style.top = (m * PPM) + 'px'; gut.appendChild(sp); }
   }
+  // минимальный масштаб: сутки ровно во всю высоту области сетки
+  function minPPM() {
+    var tg = document.querySelector('.tg'); if (!tg) return 0.4;
+    var top = tg.querySelector('.tg-top');
+    return Math.max(0.1, (tg.clientHeight - (top ? top.offsetHeight : 0)) / 1440);
+  }
   function applyZoom(ppm) {
     PPM = ppm;
     var tg = document.querySelector('.tg'); if (!tg) return;
@@ -2869,7 +2876,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     gridScroll = tg.scrollTop;
   }
   function zoomDone() {
-    zoom.raf = 0; ui.ppm = PPM; lsSet(UI_KEY, ui);
+    zoom.raf = 0; zoom.atMin = Math.abs(PPM - minPPM()) < 0.0005; ui.ppm = PPM; lsSet(UI_KEY, ui);
     document.querySelectorAll('.tg .ev').forEach(fitDesc);
   }
   function zoomTick(now) {
@@ -2887,7 +2894,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (sscroll.raf) { cancelAnimationFrame(sscroll.raf); sscroll.raf = 0; }
     zoom.yy = clientY - r.top;
     zoom.am = (tg.scrollTop + zoom.yy - (top ? top.offsetHeight : 0)) / PPM;
-    zoom.target = clamp((zoom.raf ? zoom.target : PPM) * Math.exp(-dy * 0.0045), 0.4, 64);
+    zoom.target = clamp((zoom.raf ? zoom.target : PPM) * Math.exp(-dy * 0.0045), minPPM(), 64);
     sfx('slot');
     if (settings.zoomMs <= 0) { applyZoom(zoom.target); zoomAnchor(); zoomDone(); return; }
     if (!zoom.raf) { zoom.last = performance.now(); zoom.raf = requestAnimationFrame(zoomTick); }
@@ -3477,7 +3484,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 
   /* ---------- оболочка ---------- */
   function setTop() { document.documentElement.style.setProperty('--top', $('top').offsetHeight + 'px'); }
-  window.addEventListener('resize', setTop);
+  window.addEventListener('resize', function () { setTop(); if (document.querySelector('.tg') && (PPM < minPPM() - 1e-6 || zoom.atMin)) { applyZoom(minPPM()); } });
   var lastHover = null;
   $('view').addEventListener('pointerover', function (e) {
     if (e.pointerType === 'touch' || drag || dragId || interacting) return;
