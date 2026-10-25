@@ -631,6 +631,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "Exercise",
     "Свернуть": "Collapse",
     "Развернуть": "Expand",
+    "Сдвиг высоты звука наведения": "Hover sound pitch shift",
+    "В полутонах (±12 — это октава). Один сдвиг для всех цветов.": "In semitones (±12 = one octave). One shift for all colors.",
     "Громкость звука наведения": "Hover sound volume",
     "Тихий звук при наведении на карточку, у каждого цвета свой.": "A soft sound when hovering a card; each color has its own.",
     "Подскок: размах масштаба": "Pop: scale overshoot",
@@ -876,6 +878,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "Sport",
     "Свернуть": "Einklappen",
     "Развернуть": "Ausklappen",
+    "Сдвиг высоты звука наведения": "Tonhöhe des Hover-Tons",
+    "В полутонах (±12 — это октава). Один сдвиг для всех цветов.": "In Halbtönen (±12 = eine Oktave). Eine Verschiebung für alle Farben.",
     "Громкость звука наведения": "Lautstärke Hover-Ton",
     "Тихий звук при наведении на карточку, у каждого цвета свой.": "Leiser Ton beim Überfahren einer Karte, jede Farbe klingt anders.",
     "Подскок: размах масштаба": "Pop: Größenüberschwung",
@@ -1121,6 +1125,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "锻炼",
     "Свернуть": "折叠",
     "Развернуть": "展开",
+    "Сдвиг высоты звука наведения": "悬停音效音高偏移",
+    "В полутонах (±12 — это октава). Один сдвиг для всех цветов.": "以半音为单位（±12 为一个八度）。所有颜色共用同一偏移。",
     "Громкость звука наведения": "悬停音效音量",
     "Тихий звук при наведении на карточку, у каждого цвета свой.": "鼠标悬停在卡片上时的轻柔音效，每种颜色音调不同。",
     "Подскок: размах масштаба": "弹出：缩放幅度",
@@ -1204,7 +1210,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   function sfxHover(key) {
     var tone = HOVER_TONES[key] || HOVER_TONES.none;
     SOUNDS['hover_' + key] = [{ f: tone[0], d: .07, type: tone[1], g: .5 }, { f: tone[0] * 2, d: .05, g: .15 }];
-    sfx('hover_' + key, 1, settings.hoverVol * 0.4);
+    sfx('hover_' + key, Math.pow(2, settings.hoverShift / 12), settings.hoverVol * 0.4);
   }
   function sfx(name, pitch, vol) {
     if (!settings.sound || quiet) return;
@@ -1218,8 +1224,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       var t0 = audioCtx.currentTime;
       spec.forEach(function (n) {
         var o = audioCtx.createOscillator(), g = audioCtx.createGain(), s0 = t0 + (n.at || 0), d = n.d || .08, peak = (n.g || .2) * v;
-        o.type = n.type || 'sine'; o.frequency.setValueAtTime(n.f * (pitch || 1), s0);
-        if (n.f2) o.frequency.exponentialRampToValueAtTime(n.f2 * (pitch || 1), s0 + d);
+        o.type = n.type || 'sine'; o.frequency.setValueAtTime(clamp(n.f * (pitch || 1), 20, 18000), s0);
+        if (n.f2) o.frequency.exponentialRampToValueAtTime(clamp(n.f2 * (pitch || 1), 20, 18000), s0 + d);
         g.gain.setValueAtTime(.0001, s0); g.gain.exponentialRampToValueAtTime(peak, s0 + .008); g.gain.exponentialRampToValueAtTime(.0001, s0 + d);
         o.connect(g); g.connect(audioCtx.destination); o.start(s0); o.stop(s0 + d + .02);
       });
@@ -1381,7 +1387,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   var cfg = lsGet(CFG_KEY);
   var ui = lsGet(UI_KEY) || {};
   PPM = clamp(+ui.ppm || 1, 0.4, 8);
-  var DEFAULT_SETTINGS = { entrance: 'pop', entranceMs: 900, popScale: 25, popRot: 40, popMove: 40, calW: 50, calWF: 33, sound: true, volume: 50, hoverVol: 25, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
+  var DEFAULT_SETTINGS = { entrance: 'pop', entranceMs: 900, popScale: 25, popRot: 40, popMove: 40, calW: 50, calWF: 33, sound: true, volume: 50, hoverVol: 25, hoverShift: 0, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
     lang: 'en', device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'phone' : 'computer' };
   var settings = Object.assign({}, DEFAULT_SETTINGS, ui.settings || {});
   document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms');
@@ -3091,10 +3097,12 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     return el('div', { style: 'display:flex;align-items:center;gap:8px' }, r, out);
   }
   function replayIntro() { introFlag = true; introUntil = performance.now() + 800; render(); }
-  function rngCtl(id, key, min, max, after) {
+  function rngCtl(id, key, min, max, after, unit) {
+    unit = unit || '%';
+    function fmt(v) { return (min < 0 && v > 0 ? '+' : '') + v + unit; }
     var r = el('input', { id: id, type: 'range', min: String(min), max: String(max), step: '1', value: String(settings[key]) });
-    var out = el('span', { class: 'hint', text: settings[key] + '%' });
-    r.addEventListener('input', function () { settings[key] = +r.value; out.textContent = settings[key] + '%'; saveSettings(); if (after) after(); });
+    var out = el('span', { class: 'hint', text: fmt(settings[key]) });
+    r.addEventListener('input', function () { settings[key] = +r.value; out.textContent = fmt(settings[key]); saveSettings(); if (after) after(); });
     return el('div', { style: 'display:flex;align-items:center;gap:8px' }, r, out);
   }
   function pctCtl(id, key) {
@@ -3172,6 +3180,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       row(tr('Звуки'), 's-sound', chk('s-sound', settings.sound, function (v) { settings.sound = v; if (v) sfx('save'); }), tr('Короткие звуки при создании, переносе, выполнении и удалении.')),
       row(tr('Громкость звуков'), 's-vol', pctCtl('s-vol', 'volume')),
       row(tr('Громкость звука наведения'), 's-hvol', rngCtl('s-hvol', 'hoverVol', 0, 100, function () { sfxHover('green'); }), tr('Тихий звук при наведении на карточку, у каждого цвета свой.')),
+      row(tr('Сдвиг высоты звука наведения'), 's-hshift', rngCtl('s-hshift', 'hoverShift', -48, 48, function () { sfxHover('green'); }, ' st'), tr('В полутонах (±12 — это октава). Один сдвиг для всех цветов.')),
       mode === 'local' ? null : row(tr('Сохранять после паузы'), 's-idle', sel('s-idle', settings.idle,
         [[15, tr('15 секунд')], [30, tr('30 секунд')], [60, tr('1 минута')], [120, tr('2 минуты')], [300, tr('5 минут')], [600, tr('10 минут')], [0, tr('Не сохранять по паузе')]],
         function (v) { settings.idle = +v; scheduleFlush(); }),
