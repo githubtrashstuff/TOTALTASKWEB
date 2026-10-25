@@ -19,7 +19,7 @@
 /* Layout: sticky top bar; calendar pane left, kanban right, each filling the viewport height; on phones one pane at a time via tabs. */
 :root {
   --bg: #F6F3F2; --surface: #FFFFFF; --fg: #241F21; --muted: #7B7174; --line: #E6E0DF; --col: #EEE9E8;
-  --night: rgb(20 36 110 / .40);
+  --night-rgb: 20 36 110; --work-rgb: 176 88 12; --dinner-rgb: 22 106 58;
   --accent: #E8505D; --accent-ink: #FFFFFF; --accent-soft: #FCE6E8; --warn: #B3261E; --ok: #1E6B3E; --amber: #9A5B00;
   --a-work-bg: #DDEBFA; --a-work-fg: #1F5A99;
   --a-home-bg: #FCEBD0; --a-home-fg: #8A5300;
@@ -35,7 +35,7 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --night: rgb(30 52 150 / .45);
+    --night-rgb: 30 52 150; --work-rgb: 200 100 20; --dinner-rgb: 30 130 72;
     --bg: #18151A; --surface: #242026; --fg: #F2EDED; --muted: #A59CA0; --line: #3A3238; --col: #1F1B21;
     --accent: #FF6977; --accent-ink: #2A0A0E; --accent-soft: #4A2328; --warn: #FF9A93; --ok: #8FD6A9; --amber: #F2CE92;
     --a-work-bg: #20384F; --a-work-fg: #A8CDF2;
@@ -281,7 +281,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .tg-gutter span { position: absolute; right: 6px; font-size: 11px; color: var(--muted); transform: translateY(-50%); font-variant-numeric: tabular-nums; }
 .tg-col { position: relative; border-left: 1px solid var(--line); min-width: 0;
   background-image: repeating-linear-gradient(to bottom, var(--line) 0, var(--line) 1px, transparent 1px, transparent var(--hr, 60px)); }
-.night { position: absolute; left: 0; right: 0; background: var(--night); pointer-events: none; z-index: 0; }
+.zone { position: absolute; left: 0; right: 0; pointer-events: none; z-index: 0; }
+.zone.night { background: rgb(var(--night-rgb) / var(--night-a, .42)); }
+.zone.work { background: rgb(var(--work-rgb) / var(--work-a, .3)); }
+.zone.dinner { background: rgb(var(--dinner-rgb) / var(--dinner-a, .3)); }
 .now { position: absolute; left: 0; right: 0; height: 2px; background: var(--accent); z-index: 3; pointer-events: none; }
 .now::before { content: ""; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .ev { position: absolute; z-index: 2; border: 1px solid var(--line); border-left: 3px solid var(--afg, var(--muted)); border-radius: 6px;
@@ -634,6 +637,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "Exercise",
     "Свернуть": "Collapse",
     "Развернуть": "Expand",
+    "Прозрачность: сон (синий)": "Transparency: sleep (blue)",
+    "Прозрачность: работа (оранжевый)": "Transparency: work (orange)",
+    "Прозрачность: ужин (зелёный)": "Transparency: dinner (green)",
+    "Цветные полосы времени в календаре: 23–7 сон, 10–16 работа, 19–21 ужин. Только фон, ничего не меняют.": "Colored time bands in the calendar: 23–7 sleep, 10–16 work, 19–21 dinner. Background only, nothing else changes.",
     "Анимация посадки карточки": "Card placement animation",
     "Как карточка «садится» в календарь при перетаскивании.": "How a card lands in the calendar when you drop it.",
     "Скольжение": "Glide",
@@ -888,6 +895,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "Sport",
     "Свернуть": "Einklappen",
     "Развернуть": "Ausklappen",
+    "Прозрачность: сон (синий)": "Transparenz: Schlaf (blau)",
+    "Прозрачность: работа (оранжевый)": "Transparenz: Arbeit (orange)",
+    "Прозрачность: ужин (зелёный)": "Transparenz: Abendessen (grün)",
+    "Цветные полосы времени в календаре: 23–7 сон, 10–16 работа, 19–21 ужин. Только фон, ничего не меняют.": "Farbige Zeitbänder im Kalender: 23–7 Schlaf, 10–16 Arbeit, 19–21 Abendessen. Nur Hintergrund, sonst ändert sich nichts.",
     "Анимация посадки карточки": "Animation beim Platzieren der Karte",
     "Как карточка «садится» в календарь при перетаскивании.": "Wie eine Karte beim Ablegen im Kalender landet.",
     "Скольжение": "Gleiten",
@@ -1142,6 +1153,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "锻炼",
     "Свернуть": "折叠",
     "Развернуть": "展开",
+    "Прозрачность: сон (синий)": "透明度：睡眠（蓝色）",
+    "Прозрачность: работа (оранжевый)": "透明度：工作（橙色）",
+    "Прозрачность: ужин (зелёный)": "透明度：晚餐（绿色）",
+    "Цветные полосы времени в календаре: 23–7 сон, 10–16 работа, 19–21 ужин. Только фон, ничего не меняют.": "日历中的彩色时段：23–7 睡眠，10–16 工作，19–21 晚餐。仅为背景，不影响其他内容。",
     "Анимация посадки карточки": "卡片落位动画",
     "Как карточка «садится» в календарь при перетаскивании.": "放入日历时卡片落位的方式。",
     "Скольжение": "滑行",
@@ -1411,11 +1426,18 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   var cfg = lsGet(CFG_KEY);
   var ui = lsGet(UI_KEY) || {};
   PPM = clamp(+ui.ppm || 1, 0.4, 8);
-  var DEFAULT_SETTINGS = { entrance: 'pop', entranceMs: 900, popScale: 25, popRot: 40, popMove: 40, calW: 50, calWF: 33, placeFx: 'glide', sound: true, volume: 50, hoverVol: 25, hoverShift: 0, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
+  var DEFAULT_SETTINGS = { entrance: 'pop', entranceMs: 900, popScale: 25, popRot: 40, popMove: 40, calW: 50, calWF: 33, tNight: 58, tWork: 70, tDinner: 70, placeFx: 'glide', sound: true, volume: 50, hoverVol: 25, hoverShift: 0, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
     lang: 'en', device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'phone' : 'computer' };
   var settings = Object.assign({}, DEFAULT_SETTINGS, ui.settings || {});
   document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms');
   setLang(settings.lang);
+  function applyZones() {
+    var st = document.documentElement.style;
+    st.setProperty('--night-a', String(1 - clamp(settings.tNight, 0, 100) / 100));
+    st.setProperty('--work-a', String(1 - clamp(settings.tWork, 0, 100) / 100));
+    st.setProperty('--dinner-a', String(1 - clamp(settings.tDinner, 0, 100) / 100));
+  }
+  applyZones();
   var backend = null, mode = 'github';
   var files = {};
   var actions = [];            // несохранённые действия: { at, lines: [...], ops: [...] }
@@ -2993,9 +3015,9 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var cols = keys.map(function (k) { var c = el('div', { class: 'tg-col', data: { key: k }, style: 'height:' + (1440 * PPM) + 'px' }); body.appendChild(c); return c; });
     keys.forEach(function (key, ci) {
       var col = cols[ci];
-      // 23:00–07:00: время сна, фон колонки тёмно-синий (только цвет, без действий)
-      [[0, 420], [1380, 1440]].forEach(function (r) {
-        var nz = el('div', { class: 'night', 'aria-hidden': 'true' });
+      // цветные полосы времени (только фон): сон 23–7, работа 10–16, ужин 19–21
+      [[0, 420, 'night'], [1380, 1440, 'night'], [600, 960, 'work'], [1140, 1260, 'dinner']].forEach(function (r) {
+        var nz = el('div', { class: 'zone ' + r[2], 'aria-hidden': 'true' });
         nz.style.top = (r[0] * PPM) + 'px'; nz.style.height = ((r[1] - r[0]) * PPM) + 'px';
         col.appendChild(nz);
       });
@@ -3238,6 +3260,9 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
         function (v) { settings.layout = v; $('view').dataset.layout = v; applyColumns(); }), tr('Расположение двух частей на широком экране.')),
       row(tr('Скольжение между днями'), 's-slide', msCtl('s-slide', 'slide', 2000, 100),
         tr('Как долго карточка плывёт в соседний день, когда вы тянете её в календаре. 0 — мгновенно.')),
+      row(tr('Прозрачность: сон (синий)'), 's-tnight', rngCtl('s-tnight', 'tNight', 0, 100, applyZones), tr('Цветные полосы времени в календаре: 23–7 сон, 10–16 работа, 19–21 ужин. Только фон, ничего не меняют.')),
+      row(tr('Прозрачность: работа (оранжевый)'), 's-twork', rngCtl('s-twork', 'tWork', 0, 100, applyZones)),
+      row(tr('Прозрачность: ужин (зелёный)'), 's-tdinner', rngCtl('s-tdinner', 'tDinner', 0, 100, applyZones)),
       row(tr('Анимация посадки карточки'), 's-placefx', sel('s-placefx', settings.placeFx, [['glide', tr('Скольжение')], ['spring', tr('Пружина')], ['stamp', tr('Штамп')], ['morph', tr('Растворение')], ['pop', tr('Выпрыгивание')]],
         function (v) { settings.placeFx = v; }), tr('Как карточка «садится» в календарь при перетаскивании.')),
       row(tr('Зона растягивания по краям блока'), 's-grip', pxCtl('s-grip', 'grip', 1, 12),
