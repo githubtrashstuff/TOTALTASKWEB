@@ -186,6 +186,15 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .pill { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 3px 9px; font-size: 12px; color: var(--fg); }
 .pill:hover { border-color: var(--muted); }
 .pill.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.inf-day { position: relative; }
+.inf-dh { position: sticky; top: 0; z-index: 7; box-sizing: border-box; height: 40px; min-height: 0 !important; padding: 0 28px 0 52px !important; display: flex !important; flex-direction: row !important; align-items: center; gap: 8px !important;
+  background: var(--surface); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); border-left: 0 !important; overflow: hidden; }
+.inf-dh .dw { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.inf-dh .dn { font-family: var(--font-display); font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; }
+.inf-dh .dm { font-size: 12px; color: var(--muted); }
+.inf-dh.today .dn { background: var(--accent); color: var(--accent-ink); border-radius: 999px; padding: 0 8px; }
+.inf-dh .chip { width: auto; max-width: 150px; flex: none; }
+.inf-dh .add-day { position: absolute; right: 4px; top: 8px; }
 .fold { border-top: 1px solid var(--line); }
 .fold > summary { cursor: pointer; padding: 11px 0; font-family: var(--font-display); font-weight: 600; font-size: 15px; list-style: none; display: flex; justify-content: space-between; align-items: center; }
 .fold > summary::-webkit-details-marker { display: none; }
@@ -647,6 +656,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "Exercise",
     "Свернуть": "Collapse",
     "Развернуть": "Expand",
+    "Бесконечная лента: дни подряд, прокрутка вверх и вниз": "Endless feed: days one after another, scroll up and down",
     "Общие": "General",
     "Календарь и мышь": "Calendar & mouse",
     "Анимации": "Animations",
@@ -918,6 +928,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "Sport",
     "Свернуть": "Einklappen",
     "Развернуть": "Ausklappen",
+    "Бесконечная лента: дни подряд, прокрутка вверх и вниз": "Endlose Liste: Tage hintereinander, nach oben und unten scrollen",
     "Общие": "Allgemein",
     "Календарь и мышь": "Kalender & Maus",
     "Анимации": "Animationen",
@@ -1189,6 +1200,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "锻炼",
     "Свернуть": "折叠",
     "Развернуть": "展开",
+    "Бесконечная лента: дни подряд, прокрутка вверх и вниз": "无限时间线：日期连续排列，可上下滚动",
     "Общие": "常规",
     "Календарь и мышь": "日历与鼠标",
     "Анимации": "动画",
@@ -1496,8 +1508,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   var index = {};
   var narrow = window.matchMedia('(max-width: 760px)');
   var mtab = 'cal';
-  var calMode = ['month', '3d', 'day', 'focus'].indexOf(ui.calMode) >= 0 ? ui.calMode : (narrow.matches ? 'day' : '3d');
-  if (calMode === 'focus' && narrow.matches) calMode = 'day';
+  var calMode = ['month', '3d', 'day', 'focus', 'infinite'].indexOf(ui.calMode) >= 0 ? ui.calMode : (narrow.matches ? 'day' : '3d');
+  if ((calMode === 'focus' || calMode === 'infinite') && narrow.matches) calMode = 'day';
   var introFlag = true, introUntil = performance.now() + 2500;
   var calDate = new Date(today);
   var gridScroll = Math.max(390, nowMin() - 120) * PPM;
@@ -2048,6 +2060,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (calMode === 'month') {
       var cm = new Date(calDate.getFullYear(), calDate.getMonth(), 1);
       s = addDays(cm, -((cm.getDay() + 6) % 7)); e = addDays(s, 41);
+    } else if (calMode === 'infinite') {
+      var Wd = infHalf(); s = addDays(inf.base, inf.center - Wd); e = addDays(inf.base, inf.center + Wd);
     } else { s = calDate; e = addDays(calDate, calMode === '3d' ? 2 : 0); }
     for (var d = new Date(s); d <= e; d = addDays(d, 7)) ids[weekId(d)] = 1;
     ids[weekId(e)] = 1; ids[weekId(today)] = 1;
@@ -2135,16 +2149,18 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var root = $('view');
     if (!backend) { renderConnect(root); return; }
     if (calMode === 'focus') { if (narrow.matches) calMode = 'day'; else calDate = new Date(today); }
+    if (calMode === 'infinite') { if (narrow.matches) calMode = 'day'; else if (!inf.base) inf.base = new Date(today); }
     var weeks = visibleWeeks();
     weeks.forEach(function (w) { ensureFile(weekPath(w)); });
     ensureFile(P_INBOX); ensureFile(P_BOARD); ensureFile(P_PRESETS);
     buildIndex();
     var oldBoard = root.querySelector('.board'), keepLeft = oldBoard ? oldBoard.scrollLeft : 0;
+    var infPrev = infSnap();
     var vk = viewKey(), prevRects = lastView === vk && root.firstChild ? snapRects() : null; lastView = vk;
     root.textContent = '';
     root.className = 'split';
     root.dataset.tab = mtab; root.dataset.layout = settings.layout;
-    var focusOn = calMode === 'focus' && !narrow.matches;
+    var focusOn = (calMode === 'focus' || calMode === 'infinite') && !narrow.matches;
     if (focusOn) root.dataset.focus = '1'; else delete root.dataset.focus;
     applyColumns();
     var boardEl = renderBoard(weeks);
@@ -2154,7 +2170,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var b = root.querySelector('.board'); if (b) b.scrollLeft = keepLeft;
     var sc = root.querySelector('.tg');
     if (sc && PPM < minPPM() - 1e-6) { applyZoom(minPPM()); gridScroll = 0; }
-    if (sc) { sc.scrollTop = gridScroll; sc.addEventListener('scroll', function () { if (sc.isConnected) gridScroll = sc.scrollTop; }); }
+    if (sc && sc.classList.contains('inf')) { if (!infRestore(infPrev, sc)) infCenterNow(sc); }
+    else if (sc) { sc.scrollTop = gridScroll; sc.addEventListener('scroll', function () { if (sc.isConnected) gridScroll = sc.scrollTop; }); }
     root.querySelectorAll('.ev').forEach(fitDesc);
     var introPlayed = false;
     var loadingAny = Object.keys(files).some(function (k) { return files[k].state === 'loading'; });
@@ -2727,6 +2744,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       calDate = same ? new Date(today) : new Date(calDate);
     }
     if (m === 'focus') calDate = new Date(today);
+    if (m === 'infinite') { inf.base = new Date(today); inf.center = 0; }
     calMode = m; ui.calMode = m; lsSet(UI_KEY, ui);
     introFlag = true; introUntil = performance.now() + 800;
     render();
@@ -2739,7 +2757,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   function renderCal() {
     var wrap = el('div', { class: 'cal-wrap' });
     var main = el('div', { class: 'cal-main' });
-    var title = calMode === 'month' ? cap(fmtMonth.format(calDate)) : (calMode === 'day' || calMode === 'focus') ? cap(fmtDay.format(calDate))
+    var title = calMode === 'month' ? cap(fmtMonth.format(calDate)) : (calMode === 'day' || calMode === 'focus') ? cap(fmtDay.format(calDate)) : calMode === 'infinite' ? cap(fmtMonth.format(addDays(inf.base || today, inf.center)))
       : fmtShort.format(calDate) + ' – ' + fmtShort.format(addDays(calDate, 2));
     var prev = el('button', { class: 'btn', 'aria-label': tr('Назад'), text: '←', on: { click: function () { shift(-1); } } });
     var next = el('button', { class: 'btn', 'aria-label': tr('Вперёд'), text: '→', on: { click: function () { shift(1); } } });
@@ -2748,8 +2766,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       gridScroll = Math.max(390, nowMin() - 120) * PPM; render();
     } } });
     var modes = el('div', { class: 'tabs modes' });
-    [['month', tr('Месяц')], ['3d', tr('3 дня')], ['day', tr('День')], ['focus', 'F']].forEach(function (m) {
-      var b = el('button', { class: 'tab', text: m[1], title: m[0] === 'focus' ? tr('Фокус: только сегодня, календарь по центру') : null, on: { click: function () { setMode(m[0]); } } });
+    [['month', tr('Месяц')], ['3d', tr('3 дня')], ['day', tr('День')], ['focus', 'F'], ['infinite', 'I']].forEach(function (m) {
+      var b = el('button', { class: 'tab', text: m[1], title: m[0] === 'focus' ? tr('Фокус: только сегодня, календарь по центру') : m[0] === 'infinite' ? tr('Бесконечная лента: дни подряд, прокрутка вверх и вниз') : null, on: { click: function () { setMode(m[0]); } } });
       b.setAttribute('aria-pressed', String(calMode === m[0]));
       modes.appendChild(b);
     });
@@ -2757,9 +2775,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     ac.setAttribute('aria-pressed', String(!!ui.autoColor));
     ac.addEventListener('click', function () { sfx('tick'); ui.autoColor = !ui.autoColor; lsSet(UI_KEY, ui); ac.setAttribute('aria-pressed', String(!!ui.autoColor)); });
     modes.appendChild(ac);
-    var focus = calMode === 'focus';
+    var focus = calMode === 'focus' || calMode === 'infinite';
     main.appendChild(el('div', { class: 'cal-bar' }, el('h2', { text: title }), focus ? null : prev, focus ? null : tod, focus ? null : next, modes));
     if (calMode === 'month') main.appendChild(monthGrid());
+    else if (calMode === 'infinite') main.appendChild(infGrid());
     else main.appendChild(timeGrid(calMode === 'day' || focus ? 1 : 3));
     wrap.appendChild(main);
 
@@ -2854,7 +2873,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   function minPPM() {
     var tg = document.querySelector('.tg'); if (!tg) return 0.4;
     var top = tg.querySelector('.tg-top');
-    return Math.max(0.1, (tg.clientHeight - (top ? top.offsetHeight : 0)) / 1440);
+    return Math.max(0.1, (tg.clientHeight - (tg.classList.contains('inf') ? INF_HDR : top ? top.offsetHeight : 0)) / 1440);
   }
   function applyZoom(ppm) {
     PPM = ppm;
@@ -2862,7 +2881,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     tg.style.setProperty('--hr', (60 * ppm) + 'px');
     var H = (1440 * ppm) + 'px';
     tg.querySelectorAll('.tg-col, .tg-gutter').forEach(function (n) { n.style.height = H; });
-    fillGutter(tg.querySelector('.tg-gutter'), tg);
+    tg.querySelectorAll('.tg-gutter').forEach(function (g) { fillGutter(g, tg); });
     tg.querySelectorAll('.ev').forEach(function (n) {
       if (n._s == null) return;
       var h = (n._e - n._s) * ppm;
@@ -2896,8 +2915,15 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var top = tg.querySelector('.tg-top'), r = tg.getBoundingClientRect();
     if (sscroll.raf) { cancelAnimationFrame(sscroll.raf); sscroll.raf = 0; }
     zoom.yy = clientY - r.top;
-    zoom.am = (tg.scrollTop + zoom.yy - (top ? top.offsetHeight : 0)) / PPM;
-    zoom.A = zoom.am; zoom.B = (top ? top.offsetHeight : 0) - zoom.yy;
+    if (tg.classList.contains('inf')) {
+      // дни стоят друг под другом: точка = (1440·день + минута)·масштаб + (день+1)·высота заголовка
+      var cy = tg.scrollTop + zoom.yy, bl = tg.querySelectorAll('.inf-day'), di = 0, loc = 0;
+      for (var i = 0; i < bl.length; i++) if (cy >= bl[i].offsetTop && cy < bl[i].offsetTop + bl[i].offsetHeight) { di = i; loc = cy - bl[i].offsetTop; break; }
+      zoom.A = 1440 * di + (loc - INF_HDR) / PPM; zoom.B = (di + 1) * INF_HDR - zoom.yy;
+    } else {
+      zoom.am = (tg.scrollTop + zoom.yy - (top ? top.offsetHeight : 0)) / PPM;
+      zoom.A = zoom.am; zoom.B = (top ? top.offsetHeight : 0) - zoom.yy;
+    }
     zoom.target = clamp((zoom.raf ? zoom.target : PPM) * Math.exp(-dy * 0.0045), minPPM(), 64);
     sfx('slot');
     if (settings.zoomMs <= 0) { applyZoom(zoom.target); zoomAnchor(); zoomDone(); return; }
@@ -2941,8 +2967,13 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   }
   // пробел: вернуться к линии текущего времени
   function scrollToNow() {
-    if (!document.querySelector('.now')) { calDate = new Date(today); render(); }
+    if (!document.querySelector('.now')) { calDate = new Date(today); if (calMode === 'infinite') { inf.base = new Date(today); inf.center = 0; } render(); }
     var tg = document.querySelector('.tg'); if (!tg) return;
+    if (tg.classList.contains('inf')) {
+      var nw = tg.querySelector('.now'); if (!nw) return;
+      var nr = nw.getBoundingClientRect(), tr0 = tg.getBoundingClientRect();
+      tg.scrollTo({ top: tg.scrollTop + (nr.top - tr0.top) - tg.clientHeight / 2, behavior: 'smooth' }); return;
+    }
     var top = tg.querySelector('.tg-top'), topH = top ? top.offsetHeight : 0;
     tg.scrollTo({ top: Math.max(0, nowMin() * PPM + topH - (tg.clientHeight - topH) / 2), behavior: 'smooth' });
   }
@@ -2993,11 +3024,15 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var s0 = t.start, e0 = endOf(t), dur = e0 - s0, x0 = e.clientX, y0 = e.clientY, moved = false, alt = e.altKey && mode === 'move', stay = null;
     var cur = { s: s0, e: e0, i: cols.indexOf(node.parentNode) }, startCol = cols[cols.indexOf(node.parentNode)], lastSig = '';
     var grab = minAt(node.parentNode, e.clientY) - s0;
-    function colIndexAt(x) { for (var i = 0; i < cols.length; i++) if (x < cols[i].getBoundingClientRect().right) return i; return cols.length - 1; }
+    var stacked = !!(cols[0] && cols[0].closest('.tg.inf'));
+    function colIndexAt(x, y) {
+      if (stacked) { for (var j = 0; j < cols.length; j++) if (y < cols[j].getBoundingClientRect().bottom) return j; return cols.length - 1; }
+      for (var i = 0; i < cols.length; i++) if (x < cols[i].getBoundingClientRect().right) return i; return cols.length - 1;
+    }
     function stop() { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); window.removeEventListener('pointercancel', onCancel); }
     function onMove(ev) {
       if (!moved) { if (Math.abs(ev.clientX - x0) + Math.abs(ev.clientY - y0) < 4) return; moved = true; sfx('pick'); if (alt) { stay = node.cloneNode(true); stay.style.pointerEvents = 'none'; node.removeAttribute('data-id'); node.parentNode.insertBefore(stay, node); } node.classList.add('dragging-ev'); }
-      var ci = mode === 'move' ? colIndexAt(ev.clientX) : cur.i;
+      var ci = mode === 'move' ? colIndexAt(ev.clientX, ev.clientY) : cur.i;
       var colEl = cols[ci], m = minAt(colEl, ev.clientY), s = cur.s, en = cur.e;
       if (mode === 'move') {
         s = clamp(snap(m - grab, ev), 0, 1440 - dur); en = s + dur;
@@ -3092,55 +3127,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     inlineCur = { finish: finish };
     setTimeout(function () { inp.focus(); }, 0);
   }
-  function timeGrid(n) {
-    var days = [], keys = [];
-    for (var i = 0; i < n; i++) { var d = addDays(calDate, i); days.push(d); keys.push(iso(d)); }
-    var tpl = '44px repeat(' + n + ', minmax(0, 1fr))';
-    var scroller = el('div', { class: 'tg' });
-    scroller.style.setProperty('--hr', (60 * PPM) + 'px');
-    var top = el('div', { class: 'tg-top' });
-    var head = el('div', { class: 'tg-row', style: 'grid-template-columns:' + tpl }, el('div'));
-    days.forEach(function (d, i) {
-      head.appendChild(el('div', { class: 'tg-dh' + (keys[i] === todayISO ? ' today' : '') },
-        el('span', { class: 'dw', text: cap(fmtDow.format(d)) }), el('span', { class: 'dn', text: String(d.getDate()) })));
-    });
-    top.appendChild(head);
-    var ad = el('div', { class: 'tg-row tg-allday', style: 'grid-template-columns:' + tpl }, el('div', { class: 'tg-adl', text: tr('весь день') }));
-    var items = all().filter(shownTask);
-    keys.forEach(function (key) {
-      var cell = el('div', { class: 'tg-ad' });
-      items.filter(function (t) { return t.date === key && t.start == null; }).forEach(function (t) { cell.appendChild(chipNode(t)); });
-      cell.appendChild(el('button', { class: 'add-day', title: tr('Задача на весь день'), 'aria-label': tr('Добавить задачу на ') + key, text: '+',
-        on: { click: function () { openNew({ date: key }); } } }));
-      setDrop(cell, function (id) { var d = getDraft(id); if (!d) return; d.date = key; d.start = null; d.end = null; commitTask(d); });
-      ad.appendChild(cell);
-    });
-    top.appendChild(ad);
-    scroller.appendChild(top);
-      scroller.addEventListener('contextmenu', function (e) { if (!e.target.closest('.ev, .chip')) e.preventDefault(); });
-    scroller.addEventListener('mousedown', function (e) { if (e.button === 1) e.preventDefault(); });
-    scroller.addEventListener('pointerdown', function (e) {
-      if (e.button !== 1 || e.target.closest('.tg-top')) return;
-      e.preventDefault();
-      var y0 = e.clientY, st0 = scroller.scrollTop;
-      document.body.classList.add('is-dragging');
-      function mv(ev) { scroller.scrollTop = st0 - (ev.clientY - y0); gridScroll = scroller.scrollTop; }
-      function up() { document.body.classList.remove('is-dragging'); window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); }
-      window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
-    });
-    scroller.addEventListener('wheel', function (e) {
-      if (interacting || dragId || $('modal-root').firstChild) return;
-      var dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * scroller.clientHeight : e.deltaY;
-      if (e.ctrlKey || (settings.wheel === 'zoom' ? !e.altKey : e.altKey)) { e.preventDefault(); zoomBy(dy, e.clientY); return; }
-      if (settings.zoomMs > 0 && !e.shiftKey && e.deltaY) { e.preventDefault(); smoothScrollBy(dy); }
-    }, { passive: false });
-    var body = el('div', { class: 'tg-body', style: 'grid-template-columns:' + tpl });
-    var gut = el('div', { class: 'tg-gutter', style: 'height:' + (1440 * PPM) + 'px' });
-    fillGutter(gut, scroller);
-    body.appendChild(gut);
-    var cols = keys.map(function (k) { var c = el('div', { class: 'tg-col', data: { key: k }, style: 'height:' + (1440 * PPM) + 'px' }); body.appendChild(c); return c; });
-    keys.forEach(function (key, ci) {
-      var col = cols[ci];
+  // события колонки-дня: пролёты, события, линия «сейчас», приём переноса и создание протяжкой
+  function setupCol(col, key, ci, cols, keys, items) {
       // цветные полосы времени (только фон): сон 23–7, работа 10–16, ужин 19–21
       [[0, 420, 'night'], [1380, 1440, 'night'], [600, 960, 'work'], [1140, 1260, 'dinner']].forEach(function (r) {
         var nz = el('div', { class: 'zone ' + r[2], 'aria-hidden': 'true' });
@@ -3195,7 +3183,122 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
         window.addEventListener('pointermove', onMove);
         window.addEventListener('pointerup', onUp);
       });
+    }
+  function scrollerEvents(scroller) {
+    scroller.addEventListener('contextmenu', function (e) { if (!e.target.closest('.ev, .chip')) e.preventDefault(); });
+    scroller.addEventListener('mousedown', function (e) { if (e.button === 1) e.preventDefault(); });
+    scroller.addEventListener('pointerdown', function (e) {
+      if (e.button !== 1 || e.target.closest('.tg-top')) return;
+      e.preventDefault();
+      var y0 = e.clientY, st0 = scroller.scrollTop;
+      document.body.classList.add('is-dragging');
+      function mv(ev) { scroller.scrollTop = st0 - (ev.clientY - y0); gridScroll = scroller.scrollTop; }
+      function up() { document.body.classList.remove('is-dragging'); window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); }
+      window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
     });
+    scroller.addEventListener('wheel', function (e) {
+      if (interacting || dragId || $('modal-root').firstChild) return;
+      var dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * scroller.clientHeight : e.deltaY;
+      if (e.ctrlKey || (settings.wheel === 'zoom' ? !e.altKey : e.altKey)) { e.preventDefault(); zoomBy(dy, e.clientY); return; }
+      if (settings.zoomMs > 0 && !e.shiftKey && e.deltaY) { e.preventDefault(); smoothScrollBy(dy); }
+    }, { passive: false });
+  }
+  /* ---------- режим I: бесконечная вертикальная лента дней ---------- */
+  var INF_HDR = 40, inf = { base: null, center: 0 };
+  function dayOff(key) { return Math.round((parse(key) - inf.base) / 864e5); }
+  function infHalf() {
+    var tg = document.querySelector('.tg'), vh = tg ? tg.clientHeight : 700;
+    return clamp(Math.ceil(1.6 * vh / (1440 * PPM + INF_HDR)) + 1, 3, 8);
+  }
+  function infSnap() {
+    var tg = document.querySelector('.tg.inf'); if (!tg) return null;
+    var st = tg.scrollTop, bl = tg.querySelectorAll('.inf-day');
+    for (var i = 0; i < bl.length; i++) if (st >= bl[i].offsetTop && st < bl[i].offsetTop + bl[i].offsetHeight) return { key: bl[i].dataset.key, off: st - bl[i].offsetTop, st: st };
+    return null;
+  }
+  function infRestore(snap, tg) {
+    var b = snap && tg.querySelector('.inf-day[data-key="' + snap.key + '"]');
+    if (!b) return false;
+    var ns = b.offsetTop + snap.off; tg.scrollTop = ns;
+    if (sscroll.raf) sscroll.target += tg.scrollTop - snap.st;
+    gridScroll = tg.scrollTop; return true;
+  }
+  function infCenterNow(tg) {
+    var now = tg.querySelector('.now');
+    if (now) { var nr = now.getBoundingClientRect(), tr = tg.getBoundingClientRect(); tg.scrollTop = tg.scrollTop + (nr.top - tr.top) - tg.clientHeight / 2; }
+    else { var b = tg.querySelector('.inf-day[data-key="' + iso(addDays(inf.base, inf.center)) + '"]'); if (b) tg.scrollTop = b.offsetTop; }
+    gridScroll = tg.scrollTop;
+  }
+  var infRaf = 0;
+  // заголовок месяца следует за прокруткой, окно дней пересобирается вокруг видимого дня
+  function infWatch() {
+    if (infRaf) return;
+    infRaf = requestAnimationFrame(function () {
+      infRaf = 0;
+      var tg = document.querySelector('.tg.inf'); if (!tg) return;
+      var mid = tg.scrollTop + tg.clientHeight / 2, bl = tg.querySelectorAll('.inf-day'), cur = null;
+      for (var i = 0; i < bl.length; i++) if (mid >= bl[i].offsetTop && mid < bl[i].offsetTop + bl[i].offsetHeight) { cur = bl[i]; break; }
+      if (!cur) return;
+      var h2 = document.querySelector('.cal-bar h2'); if (h2) h2.textContent = cap(fmtMonth.format(parse(cur.dataset.key)));
+      var off = dayOff(cur.dataset.key);
+      if (Math.abs(off - inf.center) >= 2 && !zoom.raf && !interacting && !dragId) { inf.center = off; render(); }
+    });
+  }
+  function infGrid() {
+    var W = infHalf(), days = [], keys = [], cols = [];
+    for (var o = inf.center - W; o <= inf.center + W; o++) { var d = addDays(inf.base, o); days.push(d); keys.push(iso(d)); }
+    var scroller = el('div', { class: 'tg inf' });
+    scroller.style.setProperty('--hr', (60 * PPM) + 'px');
+    scrollerEvents(scroller);
+    scroller.addEventListener('scroll', infWatch);
+    var items = all().filter(shownTask);
+    days.forEach(function (d, i) {
+      var key = keys[i];
+      var hdr = el('div', { class: 'inf-dh tg-ad' + (key === todayISO ? ' today' : '') },
+        el('span', { class: 'dw', text: cap(fmtDow.format(d)) }), el('span', { class: 'dn', text: String(d.getDate()) }),
+        el('span', { class: 'dm', text: cap(fmtShort.format(d)) }));
+      items.filter(function (t) { return t.date === key && t.start == null; }).forEach(function (t) { hdr.appendChild(chipNode(t)); });
+      hdr.appendChild(el('button', { class: 'add-day', title: tr('Задача на весь день'), 'aria-label': tr('Добавить задачу на ') + key, text: '+', on: { click: function () { openNew({ date: key }); } } }));
+      setDrop(hdr, function (id) { var dr = getDraft(id); if (!dr) return; dr.date = key; dr.start = null; dr.end = null; commitTask(dr); });
+      var gut = el('div', { class: 'tg-gutter', style: 'height:' + (1440 * PPM) + 'px' }); fillGutter(gut, scroller);
+      var col = el('div', { class: 'tg-col', data: { key: key }, style: 'height:' + (1440 * PPM) + 'px' }); cols.push(col);
+      scroller.appendChild(el('div', { class: 'inf-day', data: { key: key } }, hdr, el('div', { class: 'tg-body', style: 'grid-template-columns:44px minmax(0,1fr)' }, gut, col)));
+    });
+    keys.forEach(function (key, ci) { setupCol(cols[ci], key, ci, cols, keys, items); });
+    return scroller;
+  }
+  function timeGrid(n) {
+    var days = [], keys = [];
+    for (var i = 0; i < n; i++) { var d = addDays(calDate, i); days.push(d); keys.push(iso(d)); }
+    var tpl = '44px repeat(' + n + ', minmax(0, 1fr))';
+    var scroller = el('div', { class: 'tg' });
+    scroller.style.setProperty('--hr', (60 * PPM) + 'px');
+    var top = el('div', { class: 'tg-top' });
+    var head = el('div', { class: 'tg-row', style: 'grid-template-columns:' + tpl }, el('div'));
+    days.forEach(function (d, i) {
+      head.appendChild(el('div', { class: 'tg-dh' + (keys[i] === todayISO ? ' today' : '') },
+        el('span', { class: 'dw', text: cap(fmtDow.format(d)) }), el('span', { class: 'dn', text: String(d.getDate()) })));
+    });
+    top.appendChild(head);
+    var ad = el('div', { class: 'tg-row tg-allday', style: 'grid-template-columns:' + tpl }, el('div', { class: 'tg-adl', text: tr('весь день') }));
+    var items = all().filter(shownTask);
+    keys.forEach(function (key) {
+      var cell = el('div', { class: 'tg-ad' });
+      items.filter(function (t) { return t.date === key && t.start == null; }).forEach(function (t) { cell.appendChild(chipNode(t)); });
+      cell.appendChild(el('button', { class: 'add-day', title: tr('Задача на весь день'), 'aria-label': tr('Добавить задачу на ') + key, text: '+',
+        on: { click: function () { openNew({ date: key }); } } }));
+      setDrop(cell, function (id) { var d = getDraft(id); if (!d) return; d.date = key; d.start = null; d.end = null; commitTask(d); });
+      ad.appendChild(cell);
+    });
+    top.appendChild(ad);
+    scroller.appendChild(top);
+    scrollerEvents(scroller);
+    var body = el('div', { class: 'tg-body', style: 'grid-template-columns:' + tpl });
+    var gut = el('div', { class: 'tg-gutter', style: 'height:' + (1440 * PPM) + 'px' });
+    fillGutter(gut, scroller);
+    body.appendChild(gut);
+    var cols = keys.map(function (k) { var c = el('div', { class: 'tg-col', data: { key: k }, style: 'height:' + (1440 * PPM) + 'px' }); body.appendChild(c); return c; });
+    keys.forEach(function (key, ci) { setupCol(cols[ci], key, ci, cols, keys, items); });
     scroller.appendChild(body);
     return scroller;
   }
