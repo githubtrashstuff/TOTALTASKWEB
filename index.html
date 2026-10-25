@@ -98,6 +98,7 @@ main { padding-top: 14px; }
 /* board */
 .board-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
 .board-bar label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.intro-run .board, .intro-run .cal-scroll { overflow-x: hidden; }
 .board { flex: 1; min-height: 0; overflow: auto; display: flex; gap: 12px; align-items: flex-start; padding-bottom: 8px; }
 .col { flex: 0 0 248px; width: 248px; background: var(--col); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
 .col-head { display: flex; align-items: center; gap: 6px; }
@@ -254,7 +255,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .chip.done .t { text-decoration: line-through; color: var(--muted); }
 .chip.routine { border-style: dashed; }
 .more { font-size: 11px; color: var(--muted); padding-left: 4px; }
-.inbox { flex: none; max-height: 150px; overflow: auto; background: var(--col); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.inbox { flex: none; max-height: 150px; overflow: auto; overflow-x: hidden; background: var(--col); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
 .inbox h3 { font-family: var(--font-display); font-size: 15px; margin: 2px 4px 0; display: flex; justify-content: space-between; align-items: center; }
 .inbox p { margin: 0 4px; font-size: 12px; color: var(--muted); }
 .inbox-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; }
@@ -262,7 +263,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .hint { font-size: 12px; color: var(--muted); margin: 0; }
 
 /* time grid */
-.tg { flex: 1; min-height: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow-y: auto; position: relative; }
+.tg { flex: 1; min-height: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow-y: auto; overflow-x: hidden; position: relative; }
 .tg-top { position: sticky; top: 0; z-index: 6; background: var(--surface); border-bottom: 1px solid var(--line); }
 .tg-row { display: grid; }
 .tg-dh { display: flex; align-items: baseline; gap: 6px; padding: 8px 8px 6px; border-left: 1px solid var(--line); min-width: 0; }
@@ -1171,6 +1172,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   var audioCtx = null, lastSfx = {}, quiet = false;
   var SOUNDS = {
     pick: [{ f: 520, f2: 700, d: .07, g: .12 }],
+    pop: [{ f: 380, f2: 820, d: .07, g: .13 }],
     drop: [{ f: 260, f2: 140, d: .11, type: 'triangle', g: .3 }, { f: 900, f2: 500, d: .03, type: 'square', g: .04 }],
     create: [{ f: 660, d: .09, g: .18 }, { f: 990, d: .14, at: .07, g: .18 }],
     clone: [{ f: 600, d: .06, g: .16 }, { f: 800, d: .06, at: .06, g: .16 }, { f: 1000, d: .1, at: .12, g: .16 }],
@@ -1184,7 +1186,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     error: [{ f: 160, d: .16, type: 'square', g: .09 }, { f: 130, d: .18, at: .1, type: 'square', g: .09 }],
     save: [{ f: 700, d: .07, g: .14 }, { f: 1050, d: .1, at: .06, g: .14 }]
   };
-  function sfx(name) {
+  function sfx(name, pitch) {
     if (!settings.sound || quiet) return;
     var now = performance.now();
     if (lastSfx[name] && now - lastSfx[name] < 40) return;
@@ -1196,8 +1198,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       var t0 = audioCtx.currentTime;
       spec.forEach(function (n) {
         var o = audioCtx.createOscillator(), g = audioCtx.createGain(), s0 = t0 + (n.at || 0), d = n.d || .08, peak = (n.g || .2) * v;
-        o.type = n.type || 'sine'; o.frequency.setValueAtTime(n.f, s0);
-        if (n.f2) o.frequency.exponentialRampToValueAtTime(n.f2, s0 + d);
+        o.type = n.type || 'sine'; o.frequency.setValueAtTime(n.f * (pitch || 1), s0);
+        if (n.f2) o.frequency.exponentialRampToValueAtTime(n.f2 * (pitch || 1), s0 + d);
         g.gain.setValueAtTime(.0001, s0); g.gain.exponentialRampToValueAtTime(peak, s0 + .008); g.gain.exponentialRampToValueAtTime(.0001, s0 + d);
         o.connect(g); g.connect(audioCtx.destination); o.start(s0); o.stop(s0 + d + .02);
       });
@@ -1954,7 +1956,13 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (!nodes.length) return false;
     if (!(T > 0)) return true;
     var groups = { cal: [], board: [] };
-    nodes.forEach(function (n) { (n.closest('.pane-board') ? groups.board : groups.cal).push(n); });
+    // карточки вне текущего поля зрения (например, при увеличенном масштабе календаря) появляются сразу, без анимации
+    function inView(n) {
+      var r = n.getBoundingClientRect(), sc = n.closest('.tg, .board, .cal-scroll, .inbox'), c = sc ? sc.getBoundingClientRect() : { top: 0, bottom: innerHeight, left: 0, right: innerWidth };
+      return r.width > 0 && r.bottom > Math.max(c.top, 0) && r.top < Math.min(c.bottom, innerHeight) && r.right > c.left && r.left < c.right;
+    }
+    nodes.forEach(function (n) { if (inView(n)) (n.closest('.pane-board') ? groups.board : groups.cal).push(n); });
+    $('view').classList.add('intro-run');
     var o = settings.popScale / 100 * 0.3, rot = settings.popRot / 100 * 20, mv = settings.popMove / 100 * 30;
     // каждая группа (календарь и канбан) показывает карточки по очереди, обе группы идут одновременно
     Object.keys(groups).forEach(function (g) {
@@ -1971,8 +1979,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
         else if (v === 'slide') kf = [{ opacity: 0, transform: 'translateX(' + (g === 'board' ? 30 : -30) + 'px)' }, { opacity: 1, transform: 'none' }];
         else kf = [{ opacity: 0, transform: 'translateY(16px)' }, { opacity: 1, transform: 'none' }];
         n.animate(kf, { duration: D, delay: i * step, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'backwards' });
+        setTimeout(function () { sfx('pop', 0.85 + 0.6 * (i / list.length)); }, i * step + D * 0.2);
       });
     });
+    setTimeout(function () { var v2 = $('view'); if (v2) v2.classList.remove('intro-run'); }, T + 700);
     return true;
   }
   function bump(n) {
@@ -2020,7 +2030,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (sc) { sc.scrollTop = gridScroll; sc.addEventListener('scroll', function () { gridScroll = sc.scrollTop; }); }
     root.querySelectorAll('.ev').forEach(fitDesc);
     var introPlayed = false;
-    if (introFlag) { introPlayed = playIntro(); if (introPlayed || performance.now() > introUntil) introFlag = false; }
+    var loadingAny = Object.keys(files).some(function (k) { return files[k].state === 'loading'; });
+    if (introFlag && !(loadingAny && performance.now() < introUntil)) { introPlayed = playIntro(); if (introPlayed || performance.now() > introUntil) introFlag = false; }
     if (!introPlayed) playMotion(prevRects);
     $('mt-cal').setAttribute('aria-pressed', String(mtab === 'cal'));
     $('mt-board').setAttribute('aria-pressed', String(mtab === 'board'));
