@@ -284,7 +284,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .tg-ad .add-day { position: absolute; right: 2px; top: 4px; }
 .tg-body { display: grid; position: relative; }
 .tg-gutter { position: relative; }
-.tg-gutter span { position: absolute; right: 6px; font-size: 11px; color: var(--muted); transform: translateY(-50%); font-variant-numeric: tabular-nums; }
+.tg-gutter span { top: calc(var(--m, 0) * var(--ppm, 1) * 1px); position: absolute; right: 6px; font-size: 11px; color: var(--muted); transform: translateY(-50%); font-variant-numeric: tabular-nums; }
 .tg-col { position: relative; border-left: 1px solid var(--line); min-width: 0;
   background-image: repeating-linear-gradient(to bottom, var(--line) 0, var(--line) 1px, transparent 1px, transparent var(--hr, 60px)),
     repeating-linear-gradient(to bottom, color-mix(in srgb, var(--line) 50%, transparent) 0, color-mix(in srgb, var(--line) 50%, transparent) 1px, transparent 1px, transparent var(--mi, 100000px)); }
@@ -2844,9 +2844,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   function fillGutter(gut, tg) {
     var step = pickStep(PPM);
     tg.style.setProperty('--mi', step < 60 ? (step * PPM) + 'px' : '100000px');
-    if (gut._step === step) { for (var i = 0; i < gut.children.length; i++) gut.children[i].style.top = (gut.children[i]._m * PPM) + 'px'; return; }
+    gut.style.setProperty('--ppm', PPM);   // позиции подписей считаются в CSS: calc(var(--m) * var(--ppm))
+    if (gut._step === step) return;
     gut._step = step; gut.textContent = '';
-    for (var m = step; m < 1440; m += step) { var sp = el('span', { text: hhmm(m) }); sp._m = m; sp.style.top = (m * PPM) + 'px'; gut.appendChild(sp); }
+    for (var m = step; m < 1440; m += step) { var sp = el('span', { text: hhmm(m) }); sp.style.setProperty('--m', m); gut.appendChild(sp); }
   }
   // минимальный масштаб: сутки ровно во всю высоту области сетки
   function minPPM() {
@@ -2873,8 +2874,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   var zoom = { target: 1, raf: 0, am: 0, yy: 0, last: 0 };
   function zoomAnchor() {
     var tg = document.querySelector('.tg'); if (!tg) return;
-    var top = tg.querySelector('.tg-top');
-    tg.scrollTop = zoom.am * PPM + (top ? top.offsetHeight : 0) - zoom.yy;
+    tg.scrollTop = zoom.A * PPM + zoom.B;   // положение прокрутки как линейная функция масштаба
     gridScroll = tg.scrollTop;
   }
   function zoomDone() {
@@ -2896,11 +2896,32 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (sscroll.raf) { cancelAnimationFrame(sscroll.raf); sscroll.raf = 0; }
     zoom.yy = clientY - r.top;
     zoom.am = (tg.scrollTop + zoom.yy - (top ? top.offsetHeight : 0)) / PPM;
+    zoom.A = zoom.am; zoom.B = (top ? top.offsetHeight : 0) - zoom.yy;
     zoom.target = clamp((zoom.raf ? zoom.target : PPM) * Math.exp(-dy * 0.0045), minPPM(), 64);
     sfx('slot');
     if (settings.zoomMs <= 0) { applyZoom(zoom.target); zoomAnchor(); zoomDone(); return; }
     if (!zoom.raf) { zoom.last = performance.now(); zoom.raf = requestAnimationFrame(zoomTick); }
   }
+  // плавный переход к заданному масштабу и позиции прокрутки (Tab)
+  function zoomTo(p1, s1) {
+    var tg = document.querySelector('.tg'); if (!tg) return;
+    if (sscroll.raf) { cancelAnimationFrame(sscroll.raf); sscroll.raf = 0; }
+    var p0 = PPM, s0 = tg.scrollTop; zoom.target = clamp(p1, minPPM(), 64);
+    if (Math.abs(zoom.target - p0) < 1e-4) { tg.scrollTo({ top: s1, behavior: 'smooth' }); return; }
+    zoom.A = (s1 - s0) / (zoom.target - p0); zoom.B = s0 - zoom.A * p0;
+    if (settings.zoomMs <= 0) { applyZoom(zoom.target); zoomAnchor(); zoomDone(); return; }
+    if (!zoom.raf) { zoom.last = performance.now(); zoom.raf = requestAnimationFrame(zoomTick); }
+  }
+  var tabMem = null;
+  window.addEventListener('keydown', function (e) {
+    if (e.key !== 'Tab' || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
+    var tag = e.target && e.target.tagName;
+    if (/INPUT|TEXTAREA|SELECT/.test(tag || '') || $('modal-root').firstChild || ctxEl || drag || interacting || !backend) return;
+    var tg = document.querySelector('.tg'); if (!tg) return;
+    e.preventDefault(); sfx('tick');
+    if (tabMem) { var m = tabMem; tabMem = null; zoomTo(m.ppm, m.scroll); }
+    else { tabMem = { ppm: PPM, scroll: tg.scrollTop }; zoomTo(minPPM(), 0); }
+  });
   // плавная прокрутка колесом: то же время сглаживания, что и у зума
   var sscroll = { target: 0, raf: 0, last: 0 };
   function scrollTick(now) {
