@@ -325,7 +325,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .ev-input::placeholder { color: inherit; opacity: .55; font-weight: 500; }
 .ev.short .ev-input { order: -1; flex: 1; }
 .ev.ghost { pointer-events: none; background: var(--accent-soft); color: var(--accent); border-left-color: var(--accent); }
-.ev.pv { z-index: 4; opacity: 0; background: color-mix(in srgb, var(--accent) 16%, var(--surface)); box-shadow: 0 0 0 1px var(--accent), 0 6px 16px rgb(0 0 0 / .18); transition: opacity .14s; }
+.ev.pv { z-index: 4; opacity: 0; background: transparent; color: var(--muted); border: 2px dashed color-mix(in srgb, var(--fg) 45%, transparent); box-shadow: none; transition: opacity .14s; }
 .ev.pv.in { opacity: 1; transition: opacity .14s, top .1s ease-out, height .1s ease-out; }
 
 /* connect + modal */
@@ -637,6 +637,12 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "Exercise",
     "Свернуть": "Collapse",
     "Развернуть": "Expand",
+    "Лёгкий эффект, когда карточка опускается в календарь.": "A light effect when a card is dropped into the calendar.",
+    "Поп": "Pop",
+    "Посадка": "Settle",
+    "Пульс": "Pulse",
+    "Покачивание": "Wobble",
+    "Вспышка": "Flash",
     "Прозрачность: сон (синий)": "Transparency: sleep (blue)",
     "Прозрачность: работа (оранжевый)": "Transparency: work (orange)",
     "Прозрачность: ужин (зелёный)": "Transparency: dinner (green)",
@@ -895,6 +901,12 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "Sport",
     "Свернуть": "Einklappen",
     "Развернуть": "Ausklappen",
+    "Лёгкий эффект, когда карточка опускается в календарь.": "Ein leichter Effekt, wenn eine Karte im Kalender abgelegt wird.",
+    "Поп": "Pop",
+    "Посадка": "Landen",
+    "Пульс": "Puls",
+    "Покачивание": "Wackeln",
+    "Вспышка": "Aufblitzen",
     "Прозрачность: сон (синий)": "Transparenz: Schlaf (blau)",
     "Прозрачность: работа (оранжевый)": "Transparenz: Arbeit (orange)",
     "Прозрачность: ужин (зелёный)": "Transparenz: Abendessen (grün)",
@@ -1153,6 +1165,12 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "锻炼",
     "Свернуть": "折叠",
     "Развернуть": "展开",
+    "Лёгкий эффект, когда карточка опускается в календарь.": "卡片放入日历时的轻微效果。",
+    "Поп": "弹跳",
+    "Посадка": "落下",
+    "Пульс": "脉冲",
+    "Покачивание": "晃动",
+    "Вспышка": "闪光",
     "Прозрачность: сон (синий)": "透明度：睡眠（蓝色）",
     "Прозрачность: работа (оранжевый)": "透明度：工作（橙色）",
     "Прозрачность: ужин (зелёный)": "透明度：晚餐（绿色）",
@@ -1426,7 +1444,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   var cfg = lsGet(CFG_KEY);
   var ui = lsGet(UI_KEY) || {};
   PPM = clamp(+ui.ppm || 1, 0.4, 8);
-  var DEFAULT_SETTINGS = { entrance: 'pop', entranceMs: 900, popScale: 25, popRot: 40, popMove: 40, calW: 50, calWF: 33, tNight: 58, tWork: 70, tDinner: 70, placeFx: 'glide', sound: true, volume: 50, hoverVol: 25, hoverShift: 0, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
+  var DEFAULT_SETTINGS = { entrance: 'pop', entranceMs: 900, popScale: 25, popRot: 40, popMove: 40, calW: 50, calWF: 33, tNight: 58, tWork: 70, tDinner: 70, placeFx: 'pop', sound: true, volume: 50, hoverVol: 25, hoverShift: 0, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
     lang: 'en', device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'phone' : 'computer' };
   var settings = Object.assign({}, DEFAULT_SETTINGS, ui.settings || {});
   document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms');
@@ -2280,7 +2298,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
         relayoutCol(t.node, { id: '__pv', s: S.pvStart, e: S.pvStart + dur, node: pv }, S.cp ? null : S.id);
         S.liveCol = t.node;
       }
-      S.inner.style.opacity = '0';
+      S.inner.style.opacity = '1';
     } else {
       if (t.node.contains(S.node)) clearPv(S); else setPv(S, 'chip', t.node);
       S.inner.style.opacity = '1';
@@ -2330,44 +2348,17 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       if (Math.abs(r.left - S.px) + Math.abs(r.top - S.py) < 1.2 || now - t0 > 450) done(); else requestAnimationFrame(step);
     })(t0 + 16);
   }
-  var EASE = {
-    outCubic: function (k) { return 1 - Math.pow(1 - k, 3); },
-    outQuart: function (k) { return 1 - Math.pow(1 - k, 4); },
-    inOut: function (k) { return k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; },
-    back: function (k) { var c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2); }
-  };
-  // полёт клона в точку посадки; o: dur, ease, fade ('late' | 'linear' | 'none'), lift (масштаб «поднятой» карточки)
-  function flyInto(S, rectOf, done, o) {
-    o = o || {};
-    var dur = o.dur != null ? o.dur : settings.slide;
-    if (dur <= 0) { done(); return; }
-    var ease = o.ease || EASE.outCubic, inner = S.inner, w0 = S.wrap.offsetWidth, h0 = S.wrap.offsetHeight, x0 = S.px, y0 = S.py, t0 = 0;
-    inner.style.transition = 'scale .16s'; inner.style.opacity = '1'; inner.style.scale = o.lift ? String(o.lift) : '1'; S.tt = 0;
-    requestAnimationFrame(function step(now) {
-      if (!t0) t0 = now;
-      var k = Math.min(1, (now - t0) / dur), e = ease(k), r = rectOf();
-      S.px = x0 + (r.left - x0) * e; S.py = y0 + (r.top - y0) * e;
-      S.wrap.style.width = (w0 + (r.width - w0) * e) + 'px'; S.wrap.style.height = (h0 + (r.height - h0) * e) + 'px';
-      inner.style.opacity = o.fade === 'late' ? (k < .7 ? 1 : 1 - (k - .7) / .3 * .85) : o.fade === 'linear' ? 1 - k * .85 : 1;
-      if (o.lift && k > .55) inner.style.scale = '1';
-      placeClone(S);
-      if (k < 1) requestAnimationFrame(step); else done();
-    });
-  }
   function findPlaced(id) { return id ? document.querySelector('.ev[data-id="' + id + '"], .chip[data-id="' + id + '"]') : null; }
-  // эффект «посадки» уже созданного блока в календаре
+  // лёгкий эффект «посадки» уже созданного блока в календаре (все варианты короткие и без масштаба из нуля)
   function landFx(v, id) {
     var n = findPlaced(id); if (!n) return;
-    if (v === 'spring') {
-      n.style.transformOrigin = '50% 0%';
-      n.animate([{ transform: 'scale(1,1.2)' }, { transform: 'scale(1.08,.88)', offset: .4 }, { transform: 'scale(.98,1.05)', offset: .72 }, { transform: 'none' }], { duration: 420, easing: 'ease-out' });
-    } else if (v === 'stamp') {
-      sfx('drop');
-      n.animate([{ transform: 'scale(1.16)', boxShadow: '0 0 0 0 rgba(232,80,93,.7)' }, { transform: 'scale(1)', boxShadow: '0 0 0 18px rgba(232,80,93,0)' }], { duration: 380, easing: 'cubic-bezier(.2,.8,.3,1)' });
-    } else if (v === 'pop') {
-      sfx('pop', 1.1);
-      n.animate([{ transform: 'scale(0) rotate(-7deg)' }, { transform: 'scale(1.14) rotate(2deg)', offset: .6 }, { transform: 'scale(1) rotate(0deg)' }], { duration: 360, easing: 'cubic-bezier(.2,.8,.3,1)' });
-    }
+    var o = { duration: 240, easing: 'cubic-bezier(.2,.8,.3,1)' };
+    sfx('drop');
+    if (v === 'settle') n.animate([{ transform: 'translateY(-7px) scale(1.02)' }, { transform: 'none' }], o);
+    else if (v === 'pulse') n.animate([{ boxShadow: '0 0 0 0 rgba(232,80,93,.55)' }, { boxShadow: '0 0 0 14px rgba(232,80,93,0)' }], { duration: 320, easing: 'ease-out' });
+    else if (v === 'wobble') n.animate([{ transform: 'rotate(-1.6deg)' }, { transform: 'rotate(1deg)', offset: .55 }, { transform: 'none' }], o);
+    else if (v === 'flash') n.animate([{ filter: 'brightness(1.35)' }, { filter: 'none' }], { duration: 300, easing: 'ease-out' });
+    else n.animate([{ transform: 'scale(.96)' }, { transform: 'scale(1.05)', offset: .55 }, { transform: 'scale(1)' }], o);
   }
   function finish(commit) {
     var S = drag; if (!S || S.done) return;
@@ -2402,22 +2393,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
           var nid = S.preset ? instDraft(S.preset) : S.cp ? dupTask(S.id) : S.id;
           if (nid) { S.landId = typeof nid === 'object' ? nid.id : nid; if (t.kind === 'ev') dz.drop(nid, S.pvStart); else dz.drop(nid); }
         };
-        var v = settings.placeFx, D = settings.slide;
-        if (!pvEl || D <= 0) close(go, !pvEl);
-        else if (v === 'pop') {
-          S.inner.style.transition = 'opacity .09s'; S.inner.style.opacity = '0';
-          setTimeout(function () { close(go, false); landFx('pop', S.landId); }, 100);
-        } else if (v === 'morph') {
-          close(go, false, true);
-          var nn = findPlaced(S.landId);
-          if (nn) {
-            nn.animate([{ opacity: 0 }, { opacity: 1 }], { duration: D, easing: 'ease-in', fill: 'backwards' });
-            flyInto(S, function () { return nn.getBoundingClientRect(); }, function () { S.wrap.remove(); }, { dur: D, ease: EASE.inOut, fade: 'linear' });
-          } else S.wrap.remove();
-        } else {
-          var o = v === 'spring' ? { dur: D * .6, ease: EASE.back, fade: 'late' } : v === 'stamp' ? { dur: D * .7, ease: EASE.outQuart, fade: 'none', lift: 1.15 } : { dur: D, ease: EASE.outQuart, fade: 'late' };
-          flyInto(S, rectOf, function () { close(go, false); landFx(v, S.landId); }, o);
-        }
+        close(go, false);
+        landFx(settings.placeFx, S.landId);
       }
       return;
     }
@@ -3263,8 +3240,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       row(tr('Прозрачность: сон (синий)'), 's-tnight', rngCtl('s-tnight', 'tNight', 0, 100, applyZones), tr('Цветные полосы времени в календаре: 23–7 сон, 10–16 работа, 19–21 ужин. Только фон, ничего не меняют.')),
       row(tr('Прозрачность: работа (оранжевый)'), 's-twork', rngCtl('s-twork', 'tWork', 0, 100, applyZones)),
       row(tr('Прозрачность: ужин (зелёный)'), 's-tdinner', rngCtl('s-tdinner', 'tDinner', 0, 100, applyZones)),
-      row(tr('Анимация посадки карточки'), 's-placefx', sel('s-placefx', settings.placeFx, [['glide', tr('Скольжение')], ['spring', tr('Пружина')], ['stamp', tr('Штамп')], ['morph', tr('Растворение')], ['pop', tr('Выпрыгивание')]],
-        function (v) { settings.placeFx = v; }), tr('Как карточка «садится» в календарь при перетаскивании.')),
+      row(tr('Анимация посадки карточки'), 's-placefx', sel('s-placefx', settings.placeFx, [['pop', tr('Поп')], ['settle', tr('Посадка')], ['pulse', tr('Пульс')], ['wobble', tr('Покачивание')], ['flash', tr('Вспышка')]],
+        function (v) { settings.placeFx = v; }), tr('Лёгкий эффект, когда карточка опускается в календарь.')),
       row(tr('Зона растягивания по краям блока'), 's-grip', pxCtl('s-grip', 'grip', 1, 12),
         tr('Сколько пикселей у верхнего и нижнего края блока в календаре занимает растягивание. Остальное: перенос.')),
       row(tr('Контур при наведении'), 's-hover', msCtl('s-hover', 'hover', 1000, 50, function () { document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms'); }),
