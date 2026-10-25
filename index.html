@@ -280,7 +280,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .tg-gutter { position: relative; }
 .tg-gutter span { position: absolute; right: 6px; font-size: 11px; color: var(--muted); transform: translateY(-50%); font-variant-numeric: tabular-nums; }
 .tg-col { position: relative; border-left: 1px solid var(--line); min-width: 0;
-  background-image: repeating-linear-gradient(to bottom, var(--line) 0, var(--line) 1px, transparent 1px, transparent var(--hr, 60px)); }
+  background-image: repeating-linear-gradient(to bottom, var(--line) 0, var(--line) 1px, transparent 1px, transparent var(--hr, 60px)),
+    repeating-linear-gradient(to bottom, color-mix(in srgb, var(--line) 50%, transparent) 0, color-mix(in srgb, var(--line) 50%, transparent) 1px, transparent 1px, transparent var(--mi, 100000px)); }
 .zone { position: absolute; left: 0; right: 0; pointer-events: none; z-index: 0; }
 .zone.night { background: rgb(var(--night-rgb) / var(--night-a, .42)); }
 .zone.work { background: rgb(var(--work-rgb) / var(--work-a, .3)); }
@@ -1443,7 +1444,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   /* ---------- состояние ---------- */
   var cfg = lsGet(CFG_KEY);
   var ui = lsGet(UI_KEY) || {};
-  PPM = clamp(+ui.ppm || 1, 0.4, 8);
+  PPM = clamp(+ui.ppm || 1, 0.4, 16);
   var DEFAULT_SETTINGS = { entrance: 'pop', entranceMs: 900, popScale: 25, popRot: 40, popMove: 40, calW: 50, calWF: 33, tNight: 58, tWork: 70, tDinner: 70, placeFx: 'pop', sound: true, volume: 50, hoverVol: 25, hoverShift: 0, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
     lang: 'en', device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'phone' : 'computer' };
   var settings = Object.assign({}, DEFAULT_SETTINGS, ui.settings || {});
@@ -1937,7 +1938,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   function presetModal(p) {
     var d = clone(p);
     var title = el('input', { id: 'p-title', type: 'text', value: d.title, placeholder: tr('Название рутины') });
-    var dur = el('input', { id: 'p-dur', type: 'number', min: '5', step: '5', value: String(d.duration) });
+    var dur = el('input', { id: 'p-dur', type: 'number', min: '1', step: '1', value: String(d.duration) });
     var cc = d.color ? [d.color] : [], icos = (d.icons || []).slice();
     var pills = el('div', { class: 'ctx-pills' });
     [15, 30, 45, 60, 90, 120, 480].forEach(function (m) {
@@ -1946,7 +1947,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       pills.appendChild(b);
     });
     function save() {
-      var v = title.value.trim() || 'empty', n = Math.max(5, Math.round(+dur.value || 30));
+      var v = title.value.trim() || 'empty', n = Math.max(1, Math.round(+dur.value || 30));
       d.title = v; d.duration = n;
       if (cc[0]) d.color = cc[0]; else delete d.color;
       if (icos.length) d.icons = icos; else delete d.icons;
@@ -2291,8 +2292,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (t.kind === 'list') { clearPv(S); updateList(S, t.node); S.inner.style.opacity = '1'; return; }
     releaseList(S);
     if (t.kind === 'ev') {
-      var q = S.ctrl ? 1 : 5, m = minAt(t.node, S.y) - Math.min(S.dur / 2, 12);
-      var dur = clamp(S.dur, 5, 1440);
+      var q = S.ctrl || PPM >= 6 ? 1 : 5, m = minAt(t.node, S.y) - Math.min(S.dur / 2, 12);
+      var dur = clamp(S.dur, 1, 1440);
       S.pvStart = clamp(Math.round(m / q) * q, 0, 1440 - dur);
       var pv = setPv(S, 'ev', t.node);
       paintEv(pv, S.pvStart, S.pvStart + dur);
@@ -2315,7 +2316,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       var q = S.pv.el, first = q.getBoundingClientRect();
       q.getAnimations().forEach(function (a) { a.cancel(); });
       q.style.transition = 'none';
-      node.appendChild(q); paintEv(q, S.pvStart, S.pvStart + clamp(S.dur, 5, 1440));
+      node.appendChild(q); paintEv(q, S.pvStart, S.pvStart + clamp(S.dur, 1, 1440));
       var last = q.getBoundingClientRect();
       q.offsetHeight; q.style.transition = '';
       if (settings.slide > 0) q.animate([{ transform: 'translate(' + (first.left - last.left) + 'px,' + (first.top - last.top) + 'px)' }, { transform: 'none' }],
@@ -2328,7 +2329,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (kind === 'ev') {
       p = el('div', { class: 'ev ghost pv', data: { a: d.area } }, el('span', { class: 'ev-time' }), el('span', { class: 'ev-title', text: d.title }));
       p.style.left = '1px'; p.style.width = 'calc(100% - 6px)';
-      node.appendChild(p); paintEv(p, S.pvStart, S.pvStart + clamp(S.dur, 5, 1440));
+      node.appendChild(p); paintEv(p, S.pvStart, S.pvStart + clamp(S.dur, 1, 1440));
     } else {
       p = el('div', { class: 'chip ghost-chip', data: { a: d.area } }, el('span', { class: 'dot' }), el('span', { class: 't', text: d.title }));
       (node.classList.contains('inbox') ? node.querySelector('.inbox-list') : node).appendChild(p);
@@ -2768,7 +2769,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 
   function paintEv(node, s, e) {
     node.style.top = (s * PPM) + 'px';
-    node.style.height = Math.max((e - s) * PPM, 16) + 'px';
+    node.style.height = ((e - s) * PPM) + 'px';
     node.classList.toggle('short', (e - s) * PPM < 36);
     node.classList.toggle('tiny', (e - s) * PPM < 64);
     var tm = node.querySelector('.ev-time'); if (tm) tm.textContent = hhmm(s) + '–' + hhmm(e);
@@ -2985,14 +2986,17 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       var dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
       var r = scroller.getBoundingClientRect(), topH = top.offsetHeight, yy = e.clientY - r.top;
       var m = ((zoomRaf ? gridScroll : scroller.scrollTop) + yy - topH) / PPM;
-      PPM = clamp(PPM * Math.exp(-dy * 0.0015), 0.4, 8);
+      PPM = clamp(PPM * Math.exp(-dy * 0.0015), 0.4, 16);
       ui.ppm = PPM; lsSet(UI_KEY, ui);
       gridScroll = Math.max(0, m * PPM + topH - yy);
       if (!zoomRaf) zoomRaf = requestAnimationFrame(function () { zoomRaf = 0; render(); });
     }, { passive: false });
     var body = el('div', { class: 'tg-body', style: 'grid-template-columns:' + tpl });
     var gut = el('div', { class: 'tg-gutter', style: 'height:' + (1440 * PPM) + 'px' });
-    for (var h = 1; h < 24; h++) gut.appendChild(el('span', { text: pad(h) + ':00', style: 'top:' + (h * 60 * PPM) + 'px' }));
+    // шаг подписей и тонких линий зависит от масштаба: при сильном приближении видны минуты
+    var stepMin = [60, 30, 15, 10, 5, 2, 1].filter(function (m) { return m * PPM >= 28; }).pop() || 60;
+    scroller.style.setProperty('--mi', stepMin < 60 ? (stepMin * PPM) + 'px' : '100000px');
+    for (var m = stepMin; m < 1440; m += stepMin) gut.appendChild(el('span', { text: hhmm(m), style: 'top:' + (m * PPM) + 'px' }));
     body.appendChild(gut);
     var cols = keys.map(function (k) { var c = el('div', { class: 'tg-col', data: { key: k }, style: 'height:' + (1440 * PPM) + 'px' }); body.appendChild(c); return c; });
     keys.forEach(function (key, ci) {
@@ -3008,7 +3012,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       if (key === todayISO) col.appendChild(el('div', { class: 'now', style: 'top:' + (nowMin() * PPM) + 'px' }));
       setDrop(col, function (id, s) {
         var d = getDraft(id); if (!d) return;
-        var dur = clamp(d.start != null ? endOf(d) - d.start : (d.estimate || 60), 5, 1440);
+        var dur = clamp(d.start != null ? endOf(d) - d.start : (d.estimate || 60), 1, 1440);
         d.date = key; d.start = s; d.end = s + dur; commitTask(d);
       });
       col.addEventListener('pointerdown', function (e) {
@@ -3045,8 +3049,6 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
             return;
           }
 
-          if (b - a < 15) b = Math.min(1440, a + 15);
-          if (b - a < 15) a = b - 15;
           paintEv(ghost, a, b);
           inlineCreate(ghost, key, a, b);
         }
@@ -3090,7 +3092,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     [['', tr('Не задан')], ['1', tr('P1 срочно и важно')], ['2', tr('P2 важно')], ['3', tr('P3 обычное')], ['4', tr('P4 когда-нибудь')]].forEach(function (p) {
       var o = el('option', { value: p[0], text: p[1] }); if (String(task.priority || '') === p[0]) o.selected = true; pr.appendChild(o);
     });
-    var est = el('input', { id: 'f-est', type: 'number', min: '5', step: '5', value: task.estimate || '', placeholder: tr('мин') });
+    var est = el('input', { id: 'f-est', type: 'number', min: '1', step: '1', value: task.estimate || '', placeholder: tr('мин') });
     var pin = el('input', { id: 'f-pin', type: 'checkbox' }); pin.checked = !!task.pinned;
     var due = el('input', { id: 'f-due', type: 'date', value: task.due || '' }), dueE = el('input', { id: 'f-due2', type: 'date', value: task.dueEnd || '' });
     var cols = (task.colors || []).slice(), icos = (task.icons || []).slice(), cc = task.color || null;
