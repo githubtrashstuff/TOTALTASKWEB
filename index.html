@@ -186,6 +186,12 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .pill { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 3px 9px; font-size: 12px; color: var(--fg); }
 .pill:hover { border-color: var(--muted); }
 .pill.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.fold { border-top: 1px solid var(--line); }
+.fold > summary { cursor: pointer; padding: 11px 0; font-family: var(--font-display); font-weight: 600; font-size: 15px; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after { content: "›"; font-size: 20px; color: var(--muted); transition: rotate .15s; }
+.fold[open] > summary::after { rotate: 90deg; }
+.fold > .setting:first-of-type { border-top: 0; }
 .ctx-row { display: flex; align-items: center; gap: 2px; }
 .ctx-row .ctx-item { flex: 1; }
 .ctx-ico { width: 32px; height: 32px; flex: none; border: 0; background: transparent; border-radius: 8px; color: var(--muted); display: grid; place-items: center; }
@@ -638,6 +644,13 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "Exercise",
     "Свернуть": "Collapse",
     "Развернуть": "Expand",
+    "Общие": "General",
+    "Календарь и мышь": "Calendar & mouse",
+    "Анимации": "Animations",
+    "Цветные полосы времени": "Time bands",
+    "Сохранение и синхронизация": "Saving & sync",
+    "Плавность зума": "Zoom smoothing",
+    "Время сглаживания при масштабировании колесом (Ctrl или Alt + колесо). 0 — без сглаживания.": "Smoothing time when zooming with the wheel (Ctrl or Alt + wheel). 0 = no smoothing.",
     "Лёгкий эффект, когда карточка опускается в календарь.": "A light effect when a card is dropped into the calendar.",
     "Поп": "Pop",
     "Посадка": "Settle",
@@ -902,6 +915,13 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "Sport",
     "Свернуть": "Einklappen",
     "Развернуть": "Ausklappen",
+    "Общие": "Allgemein",
+    "Календарь и мышь": "Kalender & Maus",
+    "Анимации": "Animationen",
+    "Цветные полосы времени": "Zeitbänder",
+    "Сохранение и синхронизация": "Speichern & Sync",
+    "Плавность зума": "Zoom-Glättung",
+    "Время сглаживания при масштабировании колесом (Ctrl или Alt + колесо). 0 — без сглаживания.": "Glättungszeit beim Zoomen mit dem Mausrad (Strg oder Alt + Rad). 0 = keine Glättung.",
     "Лёгкий эффект, когда карточка опускается в календарь.": "Ein leichter Effekt, wenn eine Karte im Kalender abgelegt wird.",
     "Поп": "Pop",
     "Посадка": "Landen",
@@ -1166,6 +1186,13 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "锻炼",
     "Свернуть": "折叠",
     "Развернуть": "展开",
+    "Общие": "常规",
+    "Календарь и мышь": "日历与鼠标",
+    "Анимации": "动画",
+    "Цветные полосы времени": "时段色带",
+    "Сохранение и синхронизация": "保存与同步",
+    "Плавность зума": "缩放平滑度",
+    "Время сглаживания при масштабировании колесом (Ctrl или Alt + колесо). 0 — без сглаживания.": "使用滚轮缩放（Ctrl 或 Alt + 滚轮）时的平滑时间。0 表示无平滑。",
     "Лёгкий эффект, когда карточка опускается в календарь.": "卡片放入日历时的轻微效果。",
     "Поп": "弹跳",
     "Посадка": "落下",
@@ -1445,7 +1472,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   var cfg = lsGet(CFG_KEY);
   var ui = lsGet(UI_KEY) || {};
   PPM = clamp(+ui.ppm || 1, 0.4, 16);
-  var DEFAULT_SETTINGS = { entrance: 'pop', entranceMs: 900, popScale: 25, popRot: 40, popMove: 40, calW: 50, calWF: 33, tNight: 58, tWork: 70, tDinner: 70, placeFx: 'pop', sound: true, volume: 50, hoverVol: 25, hoverShift: 0, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
+  var DEFAULT_SETTINGS = { entrance: 'pop', entranceMs: 900, popScale: 25, popRot: 40, popMove: 40, calW: 50, calWF: 33, zoomMs: 160, tNight: 58, tWork: 70, tDinner: 70, placeFx: 'pop', sound: true, volume: 50, hoverVol: 25, hoverShift: 0, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
     lang: 'en', device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'phone' : 'computer' };
   var settings = Object.assign({}, DEFAULT_SETTINGS, ui.settings || {});
   document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms');
@@ -2122,7 +2149,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     root.appendChild(el('section', { class: 'pane pane-board', 'aria-label': tr('Канбан') }, boardEl));
     var b = root.querySelector('.board'); if (b) b.scrollLeft = keepLeft;
     var sc = root.querySelector('.tg');
-    if (sc) { sc.scrollTop = gridScroll; sc.addEventListener('scroll', function () { gridScroll = sc.scrollTop; }); }
+    if (sc) { sc.scrollTop = gridScroll; sc.addEventListener('scroll', function () { if (sc.isConnected) gridScroll = sc.scrollTop; }); }
     root.querySelectorAll('.ev').forEach(fitDesc);
     var introPlayed = false;
     var loadingAny = Object.keys(files).some(function (k) { return files[k].state === 'loading'; });
@@ -2768,6 +2795,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   }
 
   function paintEv(node, s, e) {
+    node._s = s; node._e = e;
     node.style.top = (s * PPM) + 'px';
     node.style.height = ((e - s) * PPM) + 'px';
     node.classList.toggle('short', (e - s) * PPM < 36);
@@ -2804,6 +2832,76 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       if (!n.classList.contains('dragging-ev')) n.style.zIndex = r.big ? '1' : '';
     });
   }
+  /* ---------- масштаб времени: плавный, строго вокруг курсора, без перерисовки ---------- */
+  function pickStep(ppm) { return [60, 30, 15, 10, 5, 2, 1].filter(function (m) { return m * ppm >= 28; }).pop() || 60; }
+  // подписи и тонкие линии: шаг зависит от масштаба (при сильном приближении видны минуты)
+  function fillGutter(gut, tg) {
+    var step = pickStep(PPM);
+    tg.style.setProperty('--mi', step < 60 ? (step * PPM) + 'px' : '100000px');
+    if (gut._step === step) { for (var i = 0; i < gut.children.length; i++) gut.children[i].style.top = (gut.children[i]._m * PPM) + 'px'; return; }
+    gut._step = step; gut.textContent = '';
+    for (var m = step; m < 1440; m += step) { var sp = el('span', { text: hhmm(m) }); sp._m = m; sp.style.top = (m * PPM) + 'px'; gut.appendChild(sp); }
+  }
+  function applyZoom(ppm) {
+    PPM = ppm;
+    var tg = document.querySelector('.tg'); if (!tg) return;
+    tg.style.setProperty('--hr', (60 * ppm) + 'px');
+    var H = (1440 * ppm) + 'px';
+    tg.querySelectorAll('.tg-col, .tg-gutter').forEach(function (n) { n.style.height = H; });
+    fillGutter(tg.querySelector('.tg-gutter'), tg);
+    tg.querySelectorAll('.ev').forEach(function (n) {
+      if (n._s == null) return;
+      var h = (n._e - n._s) * ppm;
+      n.style.top = (n._s * ppm) + 'px'; n.style.height = h + 'px';
+      n.classList.toggle('short', h < 36); n.classList.toggle('tiny', h < 64);
+    });
+    tg.querySelectorAll('.zone').forEach(function (z) { if (z._r) { z.style.top = (z._r[0] * ppm) + 'px'; z.style.height = ((z._r[1] - z._r[0]) * ppm) + 'px'; } });
+    tg.querySelectorAll('.now').forEach(function (n) { n.style.top = (nowMin() * ppm) + 'px'; });
+  }
+  var zoom = { target: 1, raf: 0, am: 0, yy: 0, last: 0 };
+  function zoomAnchor() {
+    var tg = document.querySelector('.tg'); if (!tg) return;
+    var top = tg.querySelector('.tg-top');
+    tg.scrollTop = zoom.am * PPM + (top ? top.offsetHeight : 0) - zoom.yy;
+    gridScroll = tg.scrollTop;
+  }
+  function zoomDone() {
+    zoom.raf = 0; ui.ppm = PPM; lsSet(UI_KEY, ui);
+    document.querySelectorAll('.tg .ev').forEach(fitDesc);
+  }
+  function zoomTick(now) {
+    var dt = Math.min(now - zoom.last, 50); zoom.last = now;
+    var k = 1 - Math.exp(-dt / Math.max(settings.zoomMs / 3, 1));
+    var next = PPM * Math.pow(zoom.target / PPM, k);
+    if (Math.abs(Math.log(zoom.target / next)) < 0.002) next = zoom.target;
+    applyZoom(next); zoomAnchor();
+    if (next === zoom.target) zoomDone(); else zoom.raf = requestAnimationFrame(zoomTick);
+  }
+  // minute под курсором запоминается в момент колеса и удерживается на месте всё время анимации
+  function zoomBy(dy, clientY) {
+    var tg = document.querySelector('.tg'); if (!tg) return;
+    var top = tg.querySelector('.tg-top'), r = tg.getBoundingClientRect();
+    zoom.yy = clientY - r.top;
+    zoom.am = (tg.scrollTop + zoom.yy - (top ? top.offsetHeight : 0)) / PPM;
+    zoom.target = clamp((zoom.raf ? zoom.target : PPM) * Math.exp(-dy * 0.0015), 0.4, 16);
+    sfx('slot');
+    if (settings.zoomMs <= 0) { applyZoom(zoom.target); zoomAnchor(); zoomDone(); return; }
+    if (!zoom.raf) { zoom.last = performance.now(); zoom.raf = requestAnimationFrame(zoomTick); }
+  }
+  // пробел: вернуться к линии текущего времени
+  function scrollToNow() {
+    if (!document.querySelector('.now')) { calDate = new Date(today); render(); }
+    var tg = document.querySelector('.tg'); if (!tg) return;
+    var top = tg.querySelector('.tg-top'), topH = top ? top.offsetHeight : 0;
+    tg.scrollTo({ top: Math.max(0, nowMin() * PPM + topH - (tg.clientHeight - topH) / 2), behavior: 'smooth' });
+  }
+  window.addEventListener('keydown', function (e) {
+    if (e.code !== 'Space' || e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
+    var t = e.target, tag = t && t.tagName;
+    if (/INPUT|TEXTAREA|SELECT|BUTTON|A|SUMMARY/.test(tag || '') || (t && t.isContentEditable)) return;
+    if ($('modal-root').firstChild || ctxEl || drag || interacting || !backend) return;
+    e.preventDefault(); scrollToNow();
+  });
   var BIG_MIN = 180;
   function laneLayout(items) {
     items.sort(function (a, b) { return a.start - b.start || endOf(b) - endOf(a); });
@@ -2967,8 +3065,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     });
     top.appendChild(ad);
     scroller.appendChild(top);
-    var zoomRaf = 0;
-    scroller.addEventListener('contextmenu', function (e) { if (!e.target.closest('.ev, .chip')) e.preventDefault(); });
+      scroller.addEventListener('contextmenu', function (e) { if (!e.target.closest('.ev, .chip')) e.preventDefault(); });
     scroller.addEventListener('mousedown', function (e) { if (e.button === 1) e.preventDefault(); });
     scroller.addEventListener('pointerdown', function (e) {
       if (e.button !== 1 || e.target.closest('.tg-top')) return;
@@ -2980,23 +3077,14 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
     });
     scroller.addEventListener('wheel', function (e) {
-      if (!(settings.wheel === 'zoom' ? !e.altKey : (e.altKey || e.ctrlKey))) return;
+      if (!(e.ctrlKey || (settings.wheel === 'zoom' ? !e.altKey : e.altKey))) return;
       if (interacting || dragId || $('modal-root').firstChild) return;
       e.preventDefault();
-      var dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
-      var r = scroller.getBoundingClientRect(), topH = top.offsetHeight, yy = e.clientY - r.top;
-      var m = ((zoomRaf ? gridScroll : scroller.scrollTop) + yy - topH) / PPM;
-      PPM = clamp(PPM * Math.exp(-dy * 0.0015), 0.4, 16);
-      ui.ppm = PPM; lsSet(UI_KEY, ui);
-      gridScroll = Math.max(0, m * PPM + topH - yy);
-      if (!zoomRaf) zoomRaf = requestAnimationFrame(function () { zoomRaf = 0; render(); });
+      zoomBy(e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY, e.clientY);
     }, { passive: false });
     var body = el('div', { class: 'tg-body', style: 'grid-template-columns:' + tpl });
     var gut = el('div', { class: 'tg-gutter', style: 'height:' + (1440 * PPM) + 'px' });
-    // шаг подписей и тонких линий зависит от масштаба: при сильном приближении видны минуты
-    var stepMin = [60, 30, 15, 10, 5, 2, 1].filter(function (m) { return m * PPM >= 28; }).pop() || 60;
-    scroller.style.setProperty('--mi', stepMin < 60 ? (stepMin * PPM) + 'px' : '100000px');
-    for (var m = stepMin; m < 1440; m += stepMin) gut.appendChild(el('span', { text: hhmm(m), style: 'top:' + (m * PPM) + 'px' }));
+    fillGutter(gut, scroller);
     body.appendChild(gut);
     var cols = keys.map(function (k) { var c = el('div', { class: 'tg-col', data: { key: k }, style: 'height:' + (1440 * PPM) + 'px' }); body.appendChild(c); return c; });
     keys.forEach(function (key, ci) {
@@ -3004,7 +3092,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       // цветные полосы времени (только фон): сон 23–7, работа 10–16, ужин 19–21
       [[0, 420, 'night'], [1380, 1440, 'night'], [600, 960, 'work'], [1140, 1260, 'dinner']].forEach(function (r) {
         var nz = el('div', { class: 'zone ' + r[2], 'aria-hidden': 'true' });
-        nz.style.top = (r[0] * PPM) + 'px'; nz.style.height = ((r[1] - r[0]) * PPM) + 'px';
+        nz._r = [r[0], r[1]]; nz.style.top = (r[0] * PPM) + 'px'; nz.style.height = ((r[1] - r[0]) * PPM) + 'px';
         col.appendChild(nz);
       });
       lanesFor(items.filter(function (t) { return t.date === key && t.start != null; }))
@@ -3197,6 +3285,14 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     r.addEventListener('input', function () { settings[key] = +r.value; out.textContent = (settings[key] / 1000).toFixed(2).replace(/0$/, '') + tr(' с'); saveSettings(); if (after) after(); });
     return el('div', { style: 'display:flex;align-items:center;gap:8px' }, r, out);
   }
+  var settingsOpen = {};
+  function group(key, title, rows) {
+    var d = el('details', { class: 'fold' }, el('summary', { text: title }));
+    if (settingsOpen[key]) d.open = true;
+    d.addEventListener('toggle', function () { settingsOpen[key] = d.open; });
+    rows.forEach(function (r) { if (r) d.appendChild(r); });
+    return d;
+  }
   function settingsModal() {
     function sel(id, value, opts, onChange) {
       var x = el('select', { id: id });
@@ -3233,55 +3329,68 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       el('h2', { text: tr('Настройки') }), el('p', { class: 'hint', text: info }),
       mode === 'local' ? null : el('p', { class: 'hint', text: n ? tr('Не сохранено: {what}. Они хранятся в этом браузере и не пропадут при закрытии вкладки.', { what: trn('{n} действие|{n} действия|{n} действий', n) })
         : tr('Всё сохранено.') + (lastSubject ? ' ' + tr('Последний коммит: {s}', { s: lastSubject }) : '') }),
+      group('general', tr('Общие'), [
       row(tr('Язык'), 's-lang', sel('s-lang', settings.lang, LANGS, function (v) {
         settings.lang = v; saveSettings(); setLang(v);
         if (files[P_BOARD] && !files[P_BOARD].sha) { files[P_BOARD].base = defaultBoard(); recompute(P_BOARD); }
         closeModal(); render(); settingsModal();
       })),
-      row(tr('Колесо мыши в календаре'), 's-wheel', sel('s-wheel', settings.wheel, [['scroll', tr('Прокрутка (Alt — масштаб)')], ['zoom', tr('Масштаб времени (Alt — прокрутка)')]],
-        function (v) { settings.wheel = v; }), tr('Масштаб растягивает сетку дня по вертикали вокруг курсора.')),
       row(tr('Календарь'), 's-layout', sel('s-layout', settings.layout, [['left', tr('Слева, канбан справа')], ['right', tr('Справа, канбан слева')]],
         function (v) { settings.layout = v; $('view').dataset.layout = v; applyColumns(); }), tr('Расположение двух частей на широком экране.')),
+      row(tr('Ширина календаря'), 's-calw', rngCtl('s-calw', 'calW', 25, 75, applyColumns), tr('Доля экрана в обычном режиме, %.')),
+      row(tr('Ширина календаря в фокусе'), 's-calwf', rngCtl('s-calwf', 'calWF', 20, 60, applyColumns), tr('Доля экрана в режиме F, %. Остаток делится поровну между пустой левой частью и канбаном.'))
+      ]),
+      group('calendar', tr('Календарь и мышь'), [
+      row(tr('Плавность зума'), 's-zoomms', msCtl('s-zoomms', 'zoomMs', 600, 20), tr('Время сглаживания при масштабировании колесом (Ctrl или Alt + колесо). 0 — без сглаживания.')),
+      row(tr('Колесо мыши в календаре'), 's-wheel', sel('s-wheel', settings.wheel, [['scroll', tr('Прокрутка (Alt — масштаб)')], ['zoom', tr('Масштаб времени (Alt — прокрутка)')]],
+        function (v) { settings.wheel = v; }), tr('Масштаб растягивает сетку дня по вертикали вокруг курсора.')),
+      row(tr('Зона растягивания по краям блока'), 's-grip', pxCtl('s-grip', 'grip', 1, 12),
+        tr('Сколько пикселей у верхнего и нижнего края блока в календаре занимает растягивание. Остальное: перенос.'))
+      ]),
+      group('anim', tr('Анимации'), [
       row(tr('Скольжение между днями'), 's-slide', msCtl('s-slide', 'slide', 2000, 100),
         tr('Как долго карточка плывёт в соседний день, когда вы тянете её в календаре. 0 — мгновенно.')),
-      row(tr('Прозрачность: сон (синий)'), 's-tnight', rngCtl('s-tnight', 'tNight', 0, 100, applyZones), tr('Цветные полосы времени в календаре: 23–7 сон, 10–16 работа, 19–21 ужин. Только фон, ничего не меняют.')),
-      row(tr('Прозрачность: работа (оранжевый)'), 's-twork', rngCtl('s-twork', 'tWork', 0, 100, applyZones)),
-      row(tr('Прозрачность: ужин (зелёный)'), 's-tdinner', rngCtl('s-tdinner', 'tDinner', 0, 100, applyZones)),
-      row(tr('Анимация посадки карточки'), 's-placefx', sel('s-placefx', settings.placeFx, [['pop', tr('Поп')], ['settle', tr('Посадка')], ['pulse', tr('Пульс')], ['wobble', tr('Покачивание')], ['flash', tr('Вспышка')]],
-        function (v) { settings.placeFx = v; }), tr('Лёгкий эффект, когда карточка опускается в календарь.')),
-      row(tr('Зона растягивания по краям блока'), 's-grip', pxCtl('s-grip', 'grip', 1, 12),
-        tr('Сколько пикселей у верхнего и нижнего края блока в календаре занимает растягивание. Остальное: перенос.')),
       row(tr('Контур при наведении'), 's-hover', msCtl('s-hover', 'hover', 1000, 50, function () { document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms'); }),
         tr('Как быстро появляется и гаснет рамка вокруг карточки под курсором. 0 — мгновенно.')),
-      row(tr('Ширина календаря'), 's-calw', rngCtl('s-calw', 'calW', 25, 75, applyColumns), tr('Доля экрана в обычном режиме, %.')),
-      row(tr('Ширина календаря в фокусе'), 's-calwf', rngCtl('s-calwf', 'calWF', 20, 60, applyColumns), tr('Доля экрана в режиме F, %. Остаток делится поровну между пустой левой частью и канбаном.')),
+      row(tr('Анимация посадки карточки'), 's-placefx', sel('s-placefx', settings.placeFx, [['pop', tr('Поп')], ['settle', tr('Посадка')], ['pulse', tr('Пульс')], ['wobble', tr('Покачивание')], ['flash', tr('Вспышка')]],
+        function (v) { settings.placeFx = v; }), tr('Лёгкий эффект, когда карточка опускается в календарь.')),
       row(tr('Появление карточек'), 's-intro', sel('s-intro', settings.entrance, [['pop', tr('Подскок')], ['rise', tr('Всплытие')], ['slide', tr('Сдвиг')]],
         function (v) { settings.entrance = v; replayIntro(); }), tr('Как карточки появляются при загрузке и при смене режима.')),
       row(tr('Длительность появления'), 's-introms', msCtl('s-introms', 'entranceMs', 3000, 100, replayIntro), tr('Общее время, за которое по очереди появятся все карточки в календаре и в канбане. 0 — без анимации.')),
       row(tr('Подскок: размах масштаба'), 's-pops', rngCtl('s-pops', 'popScale', 0, 100, replayIntro), tr('Сила эффекта в процентах от максимума. Прозрачность не используется.')),
       row(tr('Подскок: поворот'), 's-popr', rngCtl('s-popr', 'popRot', 0, 100, replayIntro)),
-      row(tr('Подскок: смещение'), 's-popm', rngCtl('s-popm', 'popMove', 0, 100, replayIntro)),
+      row(tr('Подскок: смещение'), 's-popm', rngCtl('s-popm', 'popMove', 0, 100, replayIntro))
+      ]),
+      group('sound', tr('Звуки'), [
       row(tr('Звуки'), 's-sound', chk('s-sound', settings.sound, function (v) { settings.sound = v; if (v) sfx('save'); }), tr('Короткие звуки при создании, переносе, выполнении и удалении.')),
       row(tr('Громкость звуков'), 's-vol', pctCtl('s-vol', 'volume')),
       row(tr('Громкость звука наведения'), 's-hvol', rngCtl('s-hvol', 'hoverVol', 0, 100, function () { sfxHover('green'); }), tr('Тихий звук при наведении на карточку, у каждого цвета свой.')),
-      row(tr('Сдвиг высоты звука наведения'), 's-hshift', rngCtl('s-hshift', 'hoverShift', -48, 48, function () { sfxHover('green'); }, ' st'), tr('В полутонах (±12 — это октава). Один сдвиг для всех цветов.')),
-      mode === 'local' ? null : row(tr('Сохранять после паузы'), 's-idle', sel('s-idle', settings.idle,
+      row(tr('Сдвиг высоты звука наведения'), 's-hshift', rngCtl('s-hshift', 'hoverShift', -48, 48, function () { sfxHover('green'); }, ' st'), tr('В полутонах (±12 — это октава). Один сдвиг для всех цветов.'))
+      ]),
+      group('zones', tr('Цветные полосы времени'), [
+      row(tr('Прозрачность: сон (синий)'), 's-tnight', rngCtl('s-tnight', 'tNight', 0, 100, applyZones), tr('Цветные полосы времени в календаре: 23–7 сон, 10–16 работа, 19–21 ужин. Только фон, ничего не меняют.')),
+      row(tr('Прозрачность: работа (оранжевый)'), 's-twork', rngCtl('s-twork', 'tWork', 0, 100, applyZones)),
+      row(tr('Прозрачность: ужин (зелёный)'), 's-tdinner', rngCtl('s-tdinner', 'tDinner', 0, 100, applyZones))
+      ]),
+      mode === 'local' ? null : group('sync', tr('Сохранение и синхронизация'), [
+      row(tr('Сохранять после паузы'), 's-idle', sel('s-idle', settings.idle,
         [[15, tr('15 секунд')], [30, tr('30 секунд')], [60, tr('1 минута')], [120, tr('2 минуты')], [300, tr('5 минут')], [600, tr('10 минут')], [0, tr('Не сохранять по паузе')]],
         function (v) { settings.idle = +v; scheduleFlush(); }),
         tr('Пока вы двигаете, пишете или держите открытым окно задачи, ничего не отправляется. Отсчёт начинается с последнего действия.')),
-      mode === 'local' ? null : row(tr('Сохранять при уходе со вкладки'), 's-hide', chk('s-hide', settings.onHide, function (v) { settings.onHide = v; }),
+      row(tr('Сохранять при уходе со вкладки'), 's-hide', chk('s-hide', settings.onHide, function (v) { settings.onHide = v; }),
         tr('Переключились на другую вкладку, свернули браузер или заблокировали телефон.')),
-      mode === 'local' ? null : row(tr('Сохранять при потере фокуса окна'), 's-blur', chk('s-blur', settings.onBlur, function (v) { settings.onBlur = v; }),
+      row(tr('Сохранять при потере фокуса окна'), 's-blur', chk('s-blur', settings.onBlur, function (v) { settings.onBlur = v; }),
         tr('Переключились в другую программу, а вкладка осталась на экране.')),
-      mode === 'local' ? null : row(tr('Объединять коммиты'), 's-squash', sel('s-squash', settings.squash,
+      row(tr('Объединять коммиты'), 's-squash', sel('s-squash', settings.squash,
         [['off', tr('Нет, каждое сохранение отдельно')], ['hour', tr('За час')], ['day', tr('За день')]],
         function (v) { settings.squash = v; }),
         tr('Новое сохранение заменяет предыдущий коммит сайта за этот час или день, если после него никто ничего не коммитил. История остаётся короткой, все действия перечислены в одном сообщении.')),
-      mode === 'local' ? null : row(tr('Проверять изменения'), 's-poll', sel('s-poll', settings.poll,
+      row(tr('Проверять изменения'), 's-poll', sel('s-poll', settings.poll,
         [[30, tr('Раз в 30 секунд')], [60, tr('Раз в минуту')], [300, tr('Раз в 5 минут')]],
         function (v) { settings.poll = +v; schedulePoll(); }),
         tr('Как часто подтягивать правки Claude и других устройств. Также проверяется при возврате на вкладку.')),
-      mode === 'local' ? null : row(tr('Имя устройства'), 's-device', device, tr('Пишется в коммит, чтобы было видно, откуда правка.')),
+      row(tr('Имя устройства'), 's-device', device, tr('Пишется в коммит, чтобы было видно, откуда правка.'))
+      ]),
       el('div', { class: 'actions' }, saveNow, exportBtn, el('span', { class: 'spacer' }), out,
         el('button', { class: 'btn', text: tr('Закрыть'), on: { click: closeModal } }))
     ]);
