@@ -2461,12 +2461,12 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   /* ---------- окна ---------- */
   function closeModal() { $('modal-root').textContent = ''; document.removeEventListener('keydown', escHandler); if (needRender) softRender(); activity(); }
   function escHandler(e) { if (e.key === 'Escape') closeModal(); }
-  function showModal(label, nodes, focusEl) {
+  function showModal(label, nodes, focusEl, onOutside) {
     closeModal();
     var modal = el('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': label });
     nodes.forEach(function (n) { if (n) modal.appendChild(n); });
     var overlay = el('div', { class: 'overlay' }, modal);
-    overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) closeModal(); });
+    overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) { if (onOutside) onOutside(); else closeModal(); } });
     $('modal-root').appendChild(overlay);
     document.addEventListener('keydown', escHandler);
     if (focusEl && !narrow.matches) focusEl.focus();
@@ -2542,7 +2542,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       task.aiNote ? el('div', { class: 'ainote' }, el('b', { text: tr('Комментарий Claude: ') }), task.aiNote) : null,
       task.carriedFrom && task.carriedFrom.length ? el('p', { class: 'hint', text: tr('Переносилась с недель: ') + task.carriedFrom.join(', ') }) : null,
       el('p', { class: 'hint', text: tr('Без даты задача лежит в Inbox. С датой и временем стоит в сетке дня.') }),
-      err, actions], title);
+      err, actions], title, function () { if (!title.value.trim()) title.value = 'empty'; commit(); });
     grow();
   }
   function claudeModal() {
