@@ -166,6 +166,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .col.routines .col-name { flex: 1; margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 15px; padding: 4px 6px; }
 .ev.has-pc, .chip.has-pc { background: var(--col); color: var(--fg); border: 2px solid var(--cc); border-left: 2px solid var(--cc); opacity: 1; --abg: var(--col); --afg: var(--fg); }
 .ev.has-pc.routine, .chip.has-pc.routine { border-style: solid; opacity: 1; }
+.tg.live .ev { transition: outline-color var(--hover-ms, 200ms) ease, left var(--live-ms, 300ms) cubic-bezier(.22,.8,.2,1), width var(--live-ms, 300ms) cubic-bezier(.22,.8,.2,1); }
+.tg.live .ev.pv.in { transition: opacity .14s, top .1s ease-out, height .1s ease-out, left var(--live-ms, 300ms) cubic-bezier(.22,.8,.2,1), width var(--live-ms, 300ms) cubic-bezier(.22,.8,.2,1); }
 .ev.has-cc { --abg: var(--fill, color-mix(in srgb, var(--cc) 80%, var(--surface))); --afg: var(--ct); border-left-color: color-mix(in srgb, var(--cc), #000 25%); }
 .ctx { position: fixed; z-index: 60; width: 272px; max-height: calc(100dvh - 16px); overflow: auto; background: var(--surface); border: 1px solid var(--line);
   border-radius: 12px; padding: 6px; box-shadow: 0 12px 32px rgb(0 0 0 / .28); font-size: 13px; display: flex; flex-direction: column; gap: 2px; }
@@ -2017,6 +2019,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (t && t.keep) t = S.tgt;
     if (t && S.preset && (t.kind === 'list' || t.node.classList.contains('inbox'))) t = null;
     S.tgt = t;
+    if (S.liveCol && !(t && t.kind === 'ev')) { relayoutCol(S.liveCol, null); S.liveCol = null; S.liveSig = ''; }
     if (!t) { releaseList(S); clearPv(S); S.inner.style.opacity = '1'; return; }
     if (t.kind === 'list') { clearPv(S); updateList(S, t.node); S.inner.style.opacity = '1'; return; }
     releaseList(S);
@@ -2026,6 +2029,13 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       S.pvStart = clamp(Math.round(m / q) * q, 0, 1440 - dur);
       var pv = setPv(S, 'ev', t.node);
       paintEv(pv, S.pvStart, S.pvStart + dur);
+      var sig = t.node.dataset.key + ':' + S.pvStart + ':' + dur;
+      if (S.liveSig !== sig) {
+        S.liveSig = sig; setLive(true);
+        if (S.liveCol && S.liveCol !== t.node) relayoutCol(S.liveCol, null);
+        relayoutCol(t.node, { id: '__pv', s: S.pvStart, e: S.pvStart + dur, node: pv }, S.cp ? null : S.id);
+        S.liveCol = t.node;
+      }
       S.inner.style.opacity = '0';
     } else {
       if (t.node.contains(S.node)) clearPv(S); else setPv(S, 'chip', t.node);
@@ -2106,6 +2116,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       else {
         if (S.ph) S.ph.remove();
         S.node.classList.remove('drag-src'); clearPv(S);
+        if (S.liveCol) { relayoutCol(S.liveCol, null); S.liveCol = null; }
         if (needRender) render();
       }
       if (fade) { S.wrap.style.transition = 'opacity .14s'; S.wrap.style.opacity = '0'; setTimeout(function () { S.wrap.remove(); }, 160); }
@@ -2505,6 +2516,26 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var n = Math.floor(avail / lh);
     if (n < 1) d.style.display = 'none'; else d.style.webkitLineClamp = String(n);
   }
+  // раскладка колонки «вживую» во время перетаскивания: окружающие блоки и сам переносимый подстраиваются сразу
+  function setLive(on) {
+    var tg = document.querySelector('.tg'); if (!tg) return;
+    document.documentElement.style.setProperty('--live-ms', settings.slide + 'ms');
+    tg.classList.toggle('live', !!on);
+  }
+  function relayoutCol(colEl, extra, skipId) {
+    var key = colEl && colEl.dataset.key; if (!key) return;
+    var items = all().filter(matches).filter(function (t) { return t.date === key && t.start != null && t.id !== skipId && !(extra && extra.id === t.id); });
+    var fake = null;
+    if (extra) { fake = { id: extra.id, start: extra.s, end: extra.e }; items.push(fake); }
+    lanesFor(items).forEach(function (r) {
+      var n = r.t === fake ? extra.node : colEl.querySelector('.ev[data-id="' + r.t.id + '"]');
+      if (!n) return;
+      var off = r.off || 0, span = r.span || 1;
+      n.style.left = 'calc(' + (off * 100 + r.lane * span * 100 / r.lanes) + '% + 1px)';
+      n.style.width = 'calc(' + (span * 100 / r.lanes) + '% - 6px)';
+      if (!n.classList.contains('dragging-ev')) n.style.zIndex = r.big ? '1' : '';
+    });
+  }
   var BIG_MIN = 180;
   function laneLayout(items) {
     items.sort(function (a, b) { return a.start - b.start || endOf(b) - endOf(a); });
@@ -2543,12 +2574,12 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     e.preventDefault(); e.stopPropagation();
     interacting = true;
     var s0 = t.start, e0 = endOf(t), dur = e0 - s0, x0 = e.clientX, y0 = e.clientY, moved = false, alt = e.altKey && mode === 'move', stay = null;
-    var cur = { s: s0, e: e0, i: cols.indexOf(node.parentNode) };
+    var cur = { s: s0, e: e0, i: cols.indexOf(node.parentNode) }, startCol = cols[cols.indexOf(node.parentNode)], lastSig = '';
     var grab = minAt(node.parentNode, e.clientY) - s0;
     function colIndexAt(x) { for (var i = 0; i < cols.length; i++) if (x < cols[i].getBoundingClientRect().right) return i; return cols.length - 1; }
     function stop() { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); window.removeEventListener('pointercancel', onCancel); }
     function onMove(ev) {
-      if (!moved) { if (Math.abs(ev.clientX - x0) + Math.abs(ev.clientY - y0) < 4) return; moved = true; sfx('pick'); if (alt) { stay = node.cloneNode(true); stay.removeAttribute('data-id'); stay.style.pointerEvents = 'none'; node.parentNode.insertBefore(stay, node); } node.classList.add('dragging-ev'); }
+      if (!moved) { if (Math.abs(ev.clientX - x0) + Math.abs(ev.clientY - y0) < 4) return; moved = true; sfx('pick'); if (alt) { stay = node.cloneNode(true); stay.style.pointerEvents = 'none'; node.removeAttribute('data-id'); node.parentNode.insertBefore(stay, node); } node.classList.add('dragging-ev'); }
       var ci = mode === 'move' ? colIndexAt(ev.clientX) : cur.i;
       var colEl = cols[ci], m = minAt(colEl, ev.clientY), s = cur.s, en = cur.e;
       if (mode === 'move') {
@@ -2565,6 +2596,13 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       } else if (mode === 'top') { s = clamp(snap(m, ev.ctrlKey), 0, e0 - 1); en = e0; }
       else { s = s0; en = clamp(snap(m, ev.ctrlKey), s0 + 1, 1440); }
       cur.s = s; cur.e = en; paintEv(node, s, en);
+      var sig = cur.i + ':' + s + ':' + en;
+      if (sig !== lastSig) {
+        lastSig = sig; setLive(true);
+        var curCol = cols[cur.i], xid = alt ? '__alt' : t.id;
+        if (curCol !== startCol && !alt) relayoutCol(startCol, null, t.id);
+        relayoutCol(curCol, { id: xid, s: s, e: en, node: node });
+      }
     }
     function onUp(ev) {
       stop(); interacting = false;
@@ -2689,7 +2727,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var gut = el('div', { class: 'tg-gutter', style: 'height:' + (1440 * PPM) + 'px' });
     for (var h = 1; h < 24; h++) gut.appendChild(el('span', { text: pad(h) + ':00', style: 'top:' + (h * 60 * PPM) + 'px' }));
     body.appendChild(gut);
-    var cols = keys.map(function () { var c = el('div', { class: 'tg-col', style: 'height:' + (1440 * PPM) + 'px' }); body.appendChild(c); return c; });
+    var cols = keys.map(function (k) { var c = el('div', { class: 'tg-col', data: { key: k }, style: 'height:' + (1440 * PPM) + 'px' }); body.appendChild(c); return c; });
     keys.forEach(function (key, ci) {
       var col = cols[ci];
       lanesFor(items.filter(function (t) { return t.date === key && t.start != null; }))
