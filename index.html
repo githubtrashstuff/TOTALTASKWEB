@@ -187,7 +187,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .ctx-row .ctx-item { flex: 1; }
 .ctx-ico { width: 32px; height: 32px; flex: none; border: 0; background: transparent; border-radius: 8px; color: var(--muted); display: grid; place-items: center; }
 .ctx-ico:hover { background: var(--col); color: var(--warn); }
-.split[data-layout="right"] .pane-cal { order: 2; }
+.split[data-layout="right"]:not([data-focus]) .pane-cal { order: 2; }
+.split[data-focus="1"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .ctx-item { border: 0; background: transparent; text-align: left; padding: 7px 8px; border-radius: 8px; display: flex; gap: 10px; align-items: center; width: 100%; color: var(--fg); }
 .ctx-item:hover { background: var(--col); }
 .ctx-item.danger { color: var(--warn); }
@@ -628,7 +629,15 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Дорога": "Commute",
     "Зарядка": "Exercise",
     "Свернуть": "Collapse",
-    "Развернуть": "Expand"
+    "Развернуть": "Expand",
+    "Фокус: только сегодня, календарь по центру": "Focus: today only, calendar in the center",
+    "Появление карточек": "Card entrance",
+    "Всплытие": "Rise",
+    "Подскок": "Pop",
+    "Сдвиг": "Slide",
+    "Как карточки появляются при загрузке и при смене режима.": "How cards appear on load and when switching modes.",
+    "Длительность появления": "Entrance duration",
+    "0 — без анимации.": "0 = no animation."
    },
    "de": {
     "Бэклог": "Backlog",
@@ -854,7 +863,15 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Дорога": "Fahrt",
     "Зарядка": "Sport",
     "Свернуть": "Einklappen",
-    "Развернуть": "Ausklappen"
+    "Развернуть": "Ausklappen",
+    "Фокус: только сегодня, календарь по центру": "Fokus: nur heute, Kalender in der Mitte",
+    "Появление карточек": "Auftritt der Karten",
+    "Всплытие": "Aufsteigen",
+    "Подскок": "Aufpoppen",
+    "Сдвиг": "Gleiten",
+    "Как карточки появляются при загрузке и при смене режима.": "Wie Karten beim Laden und beim Moduswechsel erscheinen.",
+    "Длительность появления": "Dauer des Auftritts",
+    "0 — без анимации.": "0 = keine Animation."
    },
    "zh": {
     "Бэклог": "待办",
@@ -1080,7 +1097,15 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Дорога": "通勤",
     "Зарядка": "锻炼",
     "Свернуть": "折叠",
-    "Развернуть": "展开"
+    "Развернуть": "展开",
+    "Фокус: только сегодня, календарь по центру": "专注：仅显示今天，日历居中",
+    "Появление карточек": "卡片出场",
+    "Всплытие": "上浮",
+    "Подскок": "弹出",
+    "Сдвиг": "滑入",
+    "Как карточки появляются при загрузке и при смене режима.": "加载和切换模式时卡片的出现方式。",
+    "Длительность появления": "出场时长",
+    "0 — без анимации.": "0 表示无动画。"
    }
   };
   var LANGS = [['en', 'English'], ['ru', 'Русский'], ['de', 'Deutsch'], ['zh', '中文']];
@@ -1307,7 +1332,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   var cfg = lsGet(CFG_KEY);
   var ui = lsGet(UI_KEY) || {};
   PPM = clamp(+ui.ppm || 1, 0.4, 8);
-  var DEFAULT_SETTINGS = { sound: true, volume: 50, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
+  var DEFAULT_SETTINGS = { intro: 'rise', introMs: 450, sound: true, volume: 50, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
     lang: 'en', device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'phone' : 'computer' };
   var settings = Object.assign({}, DEFAULT_SETTINGS, ui.settings || {});
   document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms');
@@ -1320,7 +1345,9 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   var index = {};
   var narrow = window.matchMedia('(max-width: 760px)');
   var mtab = 'cal';
-  var calMode = narrow.matches ? 'day' : '3d';
+  var calMode = ['month', '3d', 'day', 'focus'].indexOf(ui.calMode) >= 0 ? ui.calMode : (narrow.matches ? 'day' : '3d');
+  if (calMode === 'focus' && narrow.matches) calMode = 'day';
+  var introFlag = true, introUntil = performance.now() + 2500;
   var calDate = new Date(today);
   var gridScroll = Math.max(390, nowMin() - 120) * PPM;
   var query = '';
@@ -1885,6 +1912,21 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     });
     return m;
   }
+  // появление карточек при загрузке и смене режима: rise / pop / slide, длительность в настройках
+  function playIntro() {
+    var ms = settings.introMs, nodes = $('view').querySelectorAll('.ev[data-id], .card, .chip, .col-mini');
+    if (!nodes.length) return false;
+    if (!(ms > 0)) return true;
+    var v = settings.intro, i = 0;
+    nodes.forEach(function (n) {
+      var kf, delay = Math.min(i++ * 16, 320);
+      if (v === 'pop') kf = [{ opacity: 0, transform: 'scale(.78)' }, { opacity: 1, transform: 'scale(1.05)', offset: .65 }, { opacity: 1, transform: 'scale(1)' }];
+      else if (v === 'slide') kf = [{ opacity: 0, transform: 'translateX(' + (n.closest('.pane-board') ? 30 : -30) + 'px)' }, { opacity: 1, transform: 'none' }];
+      else kf = [{ opacity: 0, transform: 'translateY(16px)' }, { opacity: 1, transform: 'none' }];
+      n.animate(kf, { duration: ms, delay: delay, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
+    });
+    return true;
+  }
   function bump(n) {
     n.animate([{ transform: 'scale(.82)', opacity: 0 }, { transform: 'scale(1.05)', opacity: 1, offset: .55 }, { transform: 'scale(1)', opacity: 1 }], { duration: 320, easing: 'cubic-bezier(.2,.9,.3,1)' });
   }
@@ -1908,6 +1950,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     needRender = false;
     var root = $('view');
     if (!backend) { renderConnect(root); return; }
+    if (calMode === 'focus') { if (narrow.matches) calMode = 'day'; else calDate = new Date(today); }
     var weeks = visibleWeeks();
     weeks.forEach(function (w) { ensureFile(weekPath(w)); });
     ensureFile(P_INBOX); ensureFile(P_BOARD); ensureFile(P_PRESETS);
@@ -1917,14 +1960,19 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     root.textContent = '';
     root.className = 'split';
     root.dataset.tab = mtab; root.dataset.layout = settings.layout;
+    var focusOn = calMode === 'focus' && !narrow.matches;
+    if (focusOn) root.dataset.focus = '1'; else delete root.dataset.focus;
     var boardEl = renderBoard(weeks);
+    if (focusOn) root.appendChild(el('section', { class: 'pane pane-empty' }));
     root.appendChild(el('section', { class: 'pane pane-cal', 'aria-label': tr('Календарь') }, renderCal()));
     root.appendChild(el('section', { class: 'pane pane-board', 'aria-label': tr('Канбан') }, boardEl));
     var b = root.querySelector('.board'); if (b) b.scrollLeft = keepLeft;
     var sc = root.querySelector('.tg');
     if (sc) { sc.scrollTop = gridScroll; sc.addEventListener('scroll', function () { gridScroll = sc.scrollTop; }); }
     root.querySelectorAll('.ev').forEach(fitDesc);
-    playMotion(prevRects);
+    var introPlayed = false;
+    if (introFlag) { introPlayed = playIntro(); if (introPlayed || performance.now() > introUntil) introFlag = false; }
+    if (!introPlayed) playMotion(prevRects);
     $('mt-cal').setAttribute('aria-pressed', String(mtab === 'cal'));
     $('mt-board').setAttribute('aria-pressed', String(mtab === 'board'));
     setSync();
@@ -2483,7 +2531,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       var same = calDate.getMonth() === today.getMonth() && calDate.getFullYear() === today.getFullYear();
       calDate = same ? new Date(today) : new Date(calDate);
     }
-    calMode = m; render();
+    if (m === 'focus') calDate = new Date(today);
+    calMode = m; ui.calMode = m; lsSet(UI_KEY, ui);
+    introFlag = true; introUntil = performance.now() + 800;
+    render();
   }
   function shift(dir) {
     if (calMode === 'month') calDate = new Date(calDate.getFullYear(), calDate.getMonth() + dir, 1);
@@ -2493,7 +2544,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   function renderCal() {
     var wrap = el('div', { class: 'cal-wrap' });
     var main = el('div', { class: 'cal-main' });
-    var title = calMode === 'month' ? cap(fmtMonth.format(calDate)) : calMode === 'day' ? cap(fmtDay.format(calDate))
+    var title = calMode === 'month' ? cap(fmtMonth.format(calDate)) : (calMode === 'day' || calMode === 'focus') ? cap(fmtDay.format(calDate))
       : fmtShort.format(calDate) + ' – ' + fmtShort.format(addDays(calDate, 2));
     var prev = el('button', { class: 'btn', 'aria-label': tr('Назад'), text: '←', on: { click: function () { shift(-1); } } });
     var next = el('button', { class: 'btn', 'aria-label': tr('Вперёд'), text: '→', on: { click: function () { shift(1); } } });
@@ -2502,8 +2553,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       gridScroll = Math.max(390, nowMin() - 120) * PPM; render();
     } } });
     var modes = el('div', { class: 'tabs modes' });
-    [['month', tr('Месяц')], ['3d', tr('3 дня')], ['day', tr('День')]].forEach(function (m) {
-      var b = el('button', { class: 'tab', text: m[1], on: { click: function () { setMode(m[0]); } } });
+    [['month', tr('Месяц')], ['3d', tr('3 дня')], ['day', tr('День')], ['focus', 'F']].forEach(function (m) {
+      var b = el('button', { class: 'tab', text: m[1], title: m[0] === 'focus' ? tr('Фокус: только сегодня, календарь по центру') : null, on: { click: function () { setMode(m[0]); } } });
       b.setAttribute('aria-pressed', String(calMode === m[0]));
       modes.appendChild(b);
     });
@@ -2511,9 +2562,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     ac.setAttribute('aria-pressed', String(!!ui.autoColor));
     ac.addEventListener('click', function () { sfx('tick'); ui.autoColor = !ui.autoColor; lsSet(UI_KEY, ui); ac.setAttribute('aria-pressed', String(!!ui.autoColor)); });
     modes.appendChild(ac);
-    main.appendChild(el('div', { class: 'cal-bar' }, el('h2', { text: title }), prev, tod, next, modes));
+    var focus = calMode === 'focus';
+    main.appendChild(el('div', { class: 'cal-bar' }, el('h2', { text: title }), focus ? null : prev, focus ? null : tod, focus ? null : next, modes));
     if (calMode === 'month') main.appendChild(monthGrid());
-    else main.appendChild(timeGrid(calMode === 'day' ? 1 : 3));
+    else main.appendChild(timeGrid(calMode === 'day' || focus ? 1 : 3));
     wrap.appendChild(main);
 
     var undated = all().filter(function (t) { return !t.date && matches(t); })
@@ -3019,6 +3071,9 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
         tr('Сколько пикселей у верхнего и нижнего края блока в календаре занимает растягивание. Остальное: перенос.')),
       row(tr('Контур при наведении'), 's-hover', msCtl('s-hover', 'hover', 1000, 50, function () { document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms'); }),
         tr('Как быстро появляется и гаснет рамка вокруг карточки под курсором. 0 — мгновенно.')),
+      row(tr('Появление карточек'), 's-intro', sel('s-intro', settings.intro, [['rise', tr('Всплытие')], ['pop', tr('Подскок')], ['slide', tr('Сдвиг')]],
+        function (v) { settings.intro = v; introFlag = true; introUntil = performance.now() + 800; render(); }), tr('Как карточки появляются при загрузке и при смене режима.')),
+      row(tr('Длительность появления'), 's-introms', msCtl('s-introms', 'introMs', 1500, 50, function () { introFlag = true; introUntil = performance.now() + 800; render(); }), tr('0 — без анимации.')),
       row(tr('Звуки'), 's-sound', chk('s-sound', settings.sound, function (v) { settings.sound = v; if (v) sfx('save'); }), tr('Короткие звуки при создании, переносе, выполнении и удалении.')),
       row(tr('Громкость звуков'), 's-vol', pctCtl('s-vol', 'volume')),
       mode === 'local' ? null : row(tr('Сохранять после паузы'), 's-idle', sel('s-idle', settings.idle,
@@ -3094,6 +3149,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     actions = lsGet('tt-pending-v1:' + repoKey()) || [];
     ['search', 'new-task', 'btn-settings'].forEach(function (id) { $(id).hidden = false; });
     $('btn-claude').hidden = m === 'local';
+    introFlag = true; introUntil = performance.now() + 2500;
     ensureFile(P_BOARD); ensureFile(P_INBOX); ensureFile(P_PRESETS); if (m === 'github') ensureFile(P_REPORT);
     actions.forEach(function (a) { a.ops.forEach(function (op) { ensureFile(op.path); }); });
     render();
@@ -3104,8 +3160,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   /* ---------- оболочка ---------- */
   function setTop() { document.documentElement.style.setProperty('--top', $('top').offsetHeight + 'px'); }
   window.addEventListener('resize', setTop);
-  $('mt-cal').addEventListener('click', function () { mtab = 'cal'; render(); });
-  $('mt-board').addEventListener('click', function () { mtab = 'board'; render(); });
+  $('mt-cal').addEventListener('click', function () { mtab = 'cal'; introFlag = true; introUntil = performance.now() + 800; render(); });
+  $('mt-board').addEventListener('click', function () { mtab = 'board'; introFlag = true; introUntil = performance.now() + 800; render(); });
   $('new-task').addEventListener('click', function () { openNew({}); });
   $('btn-claude').addEventListener('click', claudeModal);
   $('btn-settings').addEventListener('click', settingsModal);
