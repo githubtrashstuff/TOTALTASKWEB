@@ -590,7 +590,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Фиолетовый": "Purple",
     "Розовый": "Pink",
     "Не начато": "Not started",
-    "Автоцвет: новые карточки получают цвет автоматически": "Auto color: new cards get a color automatically"
+    "Автоцвет: новые карточки получают цвет автоматически": "Auto color: new cards get a color automatically",
+    "Звуки": "Sounds",
+    "Короткие звуки при создании, переносе, выполнении и удалении.": "Short sounds for creating, moving, completing and deleting.",
+    "Громкость звуков": "Sound volume"
    },
    "de": {
     "Бэклог": "Backlog",
@@ -796,7 +799,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Фиолетовый": "Violett",
     "Розовый": "Rosa",
     "Не начато": "Nicht begonnen",
-    "Автоцвет: новые карточки получают цвет автоматически": "Autofarbe: neue Karten erhalten automatisch eine Farbe"
+    "Автоцвет: новые карточки получают цвет автоматически": "Autofarbe: neue Karten erhalten automatisch eine Farbe",
+    "Звуки": "Töne",
+    "Короткие звуки при создании, переносе, выполнении и удалении.": "Kurze Töne beim Erstellen, Verschieben, Erledigen und Löschen.",
+    "Громкость звуков": "Lautstärke"
    },
    "zh": {
     "Бэклог": "待办",
@@ -1002,7 +1008,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Фиолетовый": "紫色",
     "Розовый": "粉色",
     "Не начато": "未开始",
-    "Автоцвет: новые карточки получают цвет автоматически": "自动配色：新卡片自动获得颜色"
+    "Автоцвет: новые карточки получают цвет автоматически": "自动配色：新卡片自动获得颜色",
+    "Звуки": "声音",
+    "Короткие звуки при создании, переносе, выполнении и удалении.": "创建、移动、完成和删除时播放简短提示音。",
+    "Громкость звуков": "音量"
    }
   };
   var LANGS = [['en', 'English'], ['ru', 'Русский'], ['de', 'Deutsch'], ['zh', '中文']];
@@ -1035,6 +1044,43 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     for (var id in map) { var n = document.getElementById(id); if (n) n.textContent = tr(map[id]); }
     var se = document.getElementById('search'); if (se) { se.placeholder = tr('Поиск по задачам'); se.setAttribute('aria-label', tr('Поиск по задачам')); }
     var st = document.getElementById('btn-settings'); if (st) { st.title = tr('Настройки'); st.setAttribute('aria-label', tr('Настройки')); }
+  }
+
+  /* ---------- звуки ---------- */
+  var audioCtx = null, lastSfx = {}, quiet = false;
+  var SOUNDS = {
+    pick: [{ f: 520, f2: 700, d: .07, g: .12 }],
+    drop: [{ f: 260, f2: 140, d: .11, type: 'triangle', g: .3 }, { f: 900, f2: 500, d: .03, type: 'square', g: .04 }],
+    create: [{ f: 660, d: .09, g: .18 }, { f: 990, d: .14, at: .07, g: .18 }],
+    clone: [{ f: 600, d: .06, g: .16 }, { f: 800, d: .06, at: .06, g: .16 }, { f: 1000, d: .1, at: .12, g: .16 }],
+    done: [{ f: 523, d: .1, g: .18 }, { f: 659, d: .1, at: .08, g: .18 }, { f: 784, d: .22, at: .16, g: .2 }],
+    wip: [{ f: 440, f2: 520, d: .12, type: 'triangle', g: .2 }],
+    'delete': [{ f: 420, f2: 90, d: .22, type: 'sawtooth', g: .09 }],
+    cancel: [{ f: 300, f2: 220, d: .08, type: 'triangle', g: .18 }, { f: 220, f2: 160, d: .1, at: .08, type: 'triangle', g: .18 }],
+    tick: [{ f: 1100, d: .025, type: 'triangle', g: .1 }],
+    slot: [{ f: 760, d: .02, g: .05 }],
+    menu: [{ f: 880, f2: 1040, d: .04, g: .08 }],
+    error: [{ f: 160, d: .16, type: 'square', g: .09 }, { f: 130, d: .18, at: .1, type: 'square', g: .09 }],
+    save: [{ f: 700, d: .07, g: .14 }, { f: 1050, d: .1, at: .06, g: .14 }]
+  };
+  function sfx(name) {
+    if (!settings.sound || quiet) return;
+    var now = performance.now();
+    if (lastSfx[name] && now - lastSfx[name] < 40) return;
+    lastSfx[name] = now;
+    try {
+      if (!audioCtx) { var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; audioCtx = new AC(); }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      var v = clamp(settings.volume / 100, 0, 1), spec = SOUNDS[name]; if (!v || !spec) return;
+      var t0 = audioCtx.currentTime;
+      spec.forEach(function (n) {
+        var o = audioCtx.createOscillator(), g = audioCtx.createGain(), s0 = t0 + (n.at || 0), d = n.d || .08, peak = (n.g || .2) * v;
+        o.type = n.type || 'sine'; o.frequency.setValueAtTime(n.f, s0);
+        if (n.f2) o.frequency.exponentialRampToValueAtTime(n.f2, s0 + d);
+        g.gain.setValueAtTime(.0001, s0); g.gain.exponentialRampToValueAtTime(peak, s0 + .008); g.gain.exponentialRampToValueAtTime(.0001, s0 + d);
+        o.connect(g); g.connect(audioCtx.destination); o.start(s0); o.stop(s0 + d + .02);
+      });
+    } catch (e) {}
   }
 
   /* ---------- утилиты ---------- */
@@ -1192,7 +1238,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   var cfg = lsGet(CFG_KEY);
   var ui = lsGet(UI_KEY) || {};
   PPM = clamp(+ui.ppm || 1, 0.4, 8);
-  var DEFAULT_SETTINGS = { wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
+  var DEFAULT_SETTINGS = { sound: true, volume: 50, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
     lang: 'en', device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'phone' : 'computer' };
   var settings = Object.assign({}, DEFAULT_SETTINGS, ui.settings || {});
   document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms');
@@ -1523,6 +1569,14 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       if (!changed.length) { render(); return; }
       fields.updated = draft.updated;
     }
+    if (!prev) sfx('create');
+    else {
+      var dcol = colById(draft.status), has = function (k) { return changed.indexOf(k) >= 0; };
+      if (has('status') && dcol && dcol.done) sfx('done');
+      else if (has('wip') && draft.wip) sfx('wip');
+      else if (has('date') || has('start') || has('end') || has('status') || has('order')) sfx('drop');
+      else sfx('tick');
+    }
     var ops = [];
     if (prevPath && prevPath !== next) ops.push({ k: 'del', path: prevPath, id: draft.id });
     ops.push({ k: 'put', path: next, id: draft.id, full: clone(draft), fields: prev && prevPath === next ? fields : {} });
@@ -1531,10 +1585,11 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   }
   function removeTask(id) {
     var e = index[id]; if (!e) return;
+    sfx('delete');
     addAction([{ cls: 'удаление', text: '«' + e.t.title + '»' }], [{ k: 'del', path: e.path, id: id }]);
     render();
   }
-  function boardAction(text, op) { op.k = 'col'; op.path = P_BOARD; addAction([{ cls: 'доска', text: text }], [op]); render(); }
+  function boardAction(text, op) { sfx('tick'); op.k = 'col'; op.path = P_BOARD; addAction([{ cls: 'доска', text: text }], [op]); render(); }
   function draftOf(id) { var e = index[id]; return e ? clone(e.t) : null; }
   function newDraft(extra) {
     var t = { id: uid(), title: '', desc: '', status: columns()[0].id, date: null, start: null, end: null, priority: null, estimate: null,
@@ -1562,6 +1617,36 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     ids[weekId(e)] = 1; ids[weekId(today)] = 1;
     return Object.keys(ids).sort();
   }
+  var lastView = '';
+  function viewKey() { return [calMode, iso(calDate), PPM, settings.layout, mtab, query, ui.showRoutine ? 1 : 0, narrow.matches ? 1 : 0].join('|'); }
+  function motionKey(n) { return (n.classList.contains('ev') ? 'e:' : 'c:') + n.dataset.id; }
+  function snapRects() {
+    var m = {};
+    $('view').querySelectorAll('.ev[data-id], .card[data-id]').forEach(function (n) {
+      var r = n.getBoundingClientRect();
+      m[motionKey(n)] = r.width && r.height ? { l: r.left, t: r.top, w: r.width, h: r.height } : null;
+    });
+    return m;
+  }
+  function bump(n) {
+    n.animate([{ transform: 'scale(.82)', opacity: 0 }, { transform: 'scale(1.05)', opacity: 1, offset: .55 }, { transform: 'scale(1)', opacity: 1 }], { duration: 320, easing: 'cubic-bezier(.2,.9,.3,1)' });
+  }
+  // плавное перемещение блоков и карточек при перерисовке: старые позиции -> новые, новые появляются с «подскоком»
+  function playMotion(prev) {
+    if (!prev || settings.slide <= 0) return;
+    $('view').querySelectorAll('.ev[data-id], .card[data-id]').forEach(function (n) {
+      var k = motionKey(n);
+      if (!(k in prev)) { bump(n); return; }
+      var o = prev[k]; if (!o) return;
+      var r = n.getBoundingClientRect(), dx = o.l - r.left, dy = o.t - r.top;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(o.w - r.width) < 1 && Math.abs(o.h - r.height) < 1) return;
+      var opt = { duration: settings.slide, easing: 'cubic-bezier(.22,.8,.2,1)' };
+      if (n.classList.contains('ev')) {
+        var pr = n.offsetParent ? n.offsetParent.getBoundingClientRect() : { left: 0, top: 0 };
+        n.animate([{ left: (o.l - pr.left) + 'px', top: (o.t - pr.top) + 'px', width: o.w + 'px', height: o.h + 'px' }, {}], opt);
+      } else n.animate([{ transform: 'translate(' + dx + 'px,' + dy + 'px)' }, { transform: 'none' }], opt);
+    });
+  }
   function render() {
     needRender = false;
     var root = $('view');
@@ -1571,6 +1656,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     ensureFile(P_INBOX); ensureFile(P_BOARD);
     buildIndex();
     var oldBoard = root.querySelector('.board'), keepLeft = oldBoard ? oldBoard.scrollLeft : 0;
+    var vk = viewKey(), prevRects = lastView === vk && root.firstChild ? snapRects() : null; lastView = vk;
     root.textContent = '';
     root.className = 'split';
     root.dataset.tab = mtab; root.dataset.layout = settings.layout;
@@ -1581,6 +1667,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var sc = root.querySelector('.tg');
     if (sc) { sc.scrollTop = gridScroll; sc.addEventListener('scroll', function () { gridScroll = sc.scrollTop; }); }
     root.querySelectorAll('.ev').forEach(fitDesc);
+    playMotion(prevRects);
     $('mt-cal').setAttribute('aria-pressed', String(mtab === 'cal'));
     $('mt-board').setAttribute('aria-pressed', String(mtab === 'board'));
     setSync();
@@ -1621,7 +1708,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var t = draftOf(id); if (!t) return null;
     t.id = uid(); t.created = new Date().toISOString(); t.order = (t.order || 0) + 1;
     delete t.carriedFrom; delete t.aiNote; delete t.pinned;
-    commitTask(t);
+    quiet = true; commitTask(t); quiet = false; sfx('clone');
     return t.id;
   }
   function dragStart(node, id, x, y, pid, alt) {
@@ -1631,7 +1718,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var S = drag = { id: id, node: node, d0: d0, isCard: isCard, h: isCard ? r.height : 52, gx: x - r.left, gy: y - r.top, x: x, y: y, lx: x, tt: 0,
       px: r.left, py: r.top, tgt: null, ph: null, phList: null, phRef: null, pv: null, pvStart: 0, ctrl: false, t: performance.now(), done: false, cp: !!alt };
     S.dur = d0.start != null ? endOf(d0) - d0.start : (d0.estimate || 60);
-    dragId = id;
+    dragId = id; sfx('pick');
     document.body.classList.add('is-dragging');
     var inner = node.cloneNode(true);
     inner.removeAttribute('title'); inner.classList.remove('dragging');
@@ -1699,6 +1786,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   }
   function placeAt(S, list, ref) {
     if (S.ph && S.phList === list && S.phRef === ref) return;
+    sfx('slot');
     if (S.ph) closePh(S.ph);
     var p = makePh();
     list.insertBefore(p, ref);
@@ -1811,8 +1899,9 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     window.removeEventListener('pointermove', S.mv); window.removeEventListener('pointerup', S.up); window.removeEventListener('pointercancel', S.cancel);
     window.removeEventListener('keydown', S.key, true); window.removeEventListener('touchmove', S.tm); window.removeEventListener('contextmenu', S.cm);
     setTimeout(function () { window.removeEventListener('click', S.swallow, true); }, 80);
-    var t = S.tgt;
+    var t = S.tgt, wasCommit = commit;
     if (commit && t && t.kind === 'list' && S.isCard && !S.cp && S.phList === S.homeList && S.phRef === S.homeRef) commit = false;
+    if (!commit) sfx(wasCommit ? 'tick' : 'cancel');
     function close(commitFn, fade) {
       drag = null; dragId = null; document.body.classList.remove('is-dragging');
       if (commitFn) { commitFn(); if (S.node.isConnected) render(); }
@@ -1920,7 +2009,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   }
   function ctxMenu(e, id) {
     e.preventDefault(); e.stopPropagation();
-    closeCtx();
+    closeCtx(); sfx('menu');
     var menu = ctxEl = el('div', { class: 'ctx', role: 'menu' });
     function item(label, fn, cls, lead) {
       var b = el('button', { type: 'button', class: 'ctx-item' + (cls ? ' ' + cls : ''), role: 'menuitem' }, lead || null, el('span', { text: label }));
@@ -2155,7 +2244,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     });
     var ac = el('button', { class: 'tab ac', text: 'AC', title: tr('Автоцвет: новые карточки получают цвет автоматически'), 'aria-label': tr('Автоцвет: новые карточки получают цвет автоматически') });
     ac.setAttribute('aria-pressed', String(!!ui.autoColor));
-    ac.addEventListener('click', function () { ui.autoColor = !ui.autoColor; lsSet(UI_KEY, ui); ac.setAttribute('aria-pressed', String(!!ui.autoColor)); });
+    ac.addEventListener('click', function () { sfx('tick'); ui.autoColor = !ui.autoColor; lsSet(UI_KEY, ui); ac.setAttribute('aria-pressed', String(!!ui.autoColor)); });
     modes.appendChild(ac);
     main.appendChild(el('div', { class: 'cal-bar' }, el('h2', { text: title }), prev, tod, next, modes));
     if (calMode === 'month') main.appendChild(monthGrid());
@@ -2259,7 +2348,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     function colIndexAt(x) { for (var i = 0; i < cols.length; i++) if (x < cols[i].getBoundingClientRect().right) return i; return cols.length - 1; }
     function stop() { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); window.removeEventListener('pointercancel', onCancel); }
     function onMove(ev) {
-      if (!moved) { if (Math.abs(ev.clientX - x0) + Math.abs(ev.clientY - y0) < 4) return; moved = true; if (alt) { stay = node.cloneNode(true); stay.style.pointerEvents = 'none'; node.parentNode.insertBefore(stay, node); } node.classList.add('dragging-ev'); }
+      if (!moved) { if (Math.abs(ev.clientX - x0) + Math.abs(ev.clientY - y0) < 4) return; moved = true; sfx('pick'); if (alt) { stay = node.cloneNode(true); stay.removeAttribute('data-id'); stay.style.pointerEvents = 'none'; node.parentNode.insertBefore(stay, node); } node.classList.add('dragging-ev'); }
       var ci = mode === 'move' ? colIndexAt(ev.clientX) : cur.i;
       var colEl = cols[ci], m = minAt(colEl, ev.clientY), s = cur.s, en = cur.e;
       if (mode === 'move') {
@@ -2341,7 +2430,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     }
     inp.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') { e.preventDefault(); finish(true); }
-      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); sfx('cancel'); finish(false); }
     });
     inp.addEventListener('blur', function () { finish(true); });
     inlineCur = { finish: finish };
@@ -2497,7 +2586,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var err = el('div', { class: 'err', hidden: true });
     function commit() {
       var v = title.value.trim();
-      if (!v) { err.hidden = false; err.textContent = tr('Введите название задачи.'); title.focus(); return; }
+      if (!v) { err.hidden = false; sfx('error'); err.textContent = tr('Введите название задачи.'); title.focus(); return; }
       task.title = v; task.desc = desc.value.trim() || null; task.status = status.value; task.date = date.value || null;
       task.area = area.value || null; task.priority = pr.value ? +pr.value : null;
       if (cols.length) task.colors = cols; else delete task.colors;
@@ -2513,7 +2602,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
         if (s == null) s = Math.max(0, en - (task.estimate || 60));
         if (en == null) en = Math.min(1440, s + (task.estimate || 60));
         if (en === 0 && s > 0) en = 1440;
-        if (en <= s) { err.hidden = false; err.textContent = tr('Конец должен быть позже начала.'); return; }
+        if (en <= s) { err.hidden = false; sfx('error'); err.textContent = tr('Конец должен быть позже начала.'); return; }
         task.start = s; task.end = en;
       }
       commitTask(task); closeModal();
@@ -2573,6 +2662,13 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     r.addEventListener('input', function () { settings[key] = +r.value; out.textContent = settings[key] + ' px'; saveSettings(); });
     return el('div', { style: 'display:flex;align-items:center;gap:8px' }, r, out);
   }
+  function pctCtl(id, key) {
+    var r = el('input', { id: id, type: 'range', min: '0', max: '100', step: '5', value: String(settings[key]) });
+    var out = el('span', { class: 'hint', text: settings[key] + '%' });
+    r.addEventListener('input', function () { settings[key] = +r.value; out.textContent = settings[key] + '%'; saveSettings(); });
+    r.addEventListener('change', function () { sfx('save'); });
+    return el('div', { style: 'display:flex;align-items:center;gap:8px' }, r, out);
+  }
   function msCtl(id, key, max, step, after) {
     var r = el('input', { id: id, type: 'range', min: '0', max: String(max), step: String(step), value: String(settings[key]) });
     var out = el('span', { class: 'hint', text: (settings[key] / 1000).toFixed(2).replace(/0$/, '') + tr(' с') });
@@ -2630,6 +2726,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
         tr('Сколько пикселей у верхнего и нижнего края блока в календаре занимает растягивание. Остальное: перенос.')),
       row(tr('Контур при наведении'), 's-hover', msCtl('s-hover', 'hover', 1000, 50, function () { document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms'); }),
         tr('Как быстро появляется и гаснет рамка вокруг карточки под курсором. 0 — мгновенно.')),
+      row(tr('Звуки'), 's-sound', chk('s-sound', settings.sound, function (v) { settings.sound = v; if (v) sfx('save'); }), tr('Короткие звуки при создании, переносе, выполнении и удалении.')),
+      row(tr('Громкость звуков'), 's-vol', pctCtl('s-vol', 'volume')),
       mode === 'local' ? null : row(tr('Сохранять после паузы'), 's-idle', sel('s-idle', settings.idle,
         [[15, tr('15 секунд')], [30, tr('30 секунд')], [60, tr('1 минута')], [120, tr('2 минуты')], [300, tr('5 минут')], [600, tr('10 минут')], [0, tr('Не сохранять по паузе')]],
         function (v) { settings.idle = +v; scheduleFlush(); }),
@@ -2667,7 +2765,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       var b = new GitHubBackend(c);
       b.check().then(function () { cfg = c; lsSet(CFG_KEY, cfg); start(new GitHubBackend(cfg), 'github'); })
         .catch(function (e) {
-          go.disabled = false; go.textContent = tr('Подключить'); err.hidden = false;
+          go.disabled = false; go.textContent = tr('Подключить'); err.hidden = false; sfx('error');
           err.textContent = e.status === 401 ? tr('Токен не подошёл. Проверьте, что скопировали его целиком.')
             : e.status === 404 ? tr('Репозиторий не найден, или у токена нет к нему доступа. Проверьте название и Repository access у токена.')
             : e.status ? tr('GitHub ответил: {m}', { m: e.message }) : tr('Нет связи с GitHub. Проверьте интернет.');
