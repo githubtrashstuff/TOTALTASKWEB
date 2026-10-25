@@ -85,6 +85,8 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .btn[disabled] { opacity: .5; cursor: default; }
 .tabs { display: flex; gap: 2px; background: var(--col); padding: 3px; border-radius: 10px; }
 .tab { border: 0; background: transparent; padding: 6px 12px; border-radius: 8px; font-weight: 500; color: var(--muted); }
+.tab.ac { margin-left: 4px; font-weight: 600; letter-spacing: .04em; }
+.tab.ac[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 .tab[aria-pressed="true"] { background: var(--surface); color: var(--fg); box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
 .mtabs { display: none; }
 
@@ -587,7 +589,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Синий": "Blue",
     "Фиолетовый": "Purple",
     "Розовый": "Pink",
-    "Не начато": "Not started"
+    "Не начато": "Not started",
+    "Автоцвет: новые карточки получают цвет автоматически": "Auto color: new cards get a color automatically"
    },
    "de": {
     "Бэклог": "Backlog",
@@ -792,7 +795,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Синий": "Blau",
     "Фиолетовый": "Violett",
     "Розовый": "Rosa",
-    "Не начато": "Nicht begonnen"
+    "Не начато": "Nicht begonnen",
+    "Автоцвет: новые карточки получают цвет автоматически": "Autofarbe: neue Karten erhalten automatisch eine Farbe"
    },
    "zh": {
     "Бэклог": "待办",
@@ -997,7 +1001,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Синий": "蓝色",
     "Фиолетовый": "紫色",
     "Розовый": "粉色",
-    "Не начато": "未开始"
+    "Не начато": "未开始",
+    "Автоцвет: новые карточки получают цвет автоматически": "自动配色：新卡片自动获得颜色"
    }
   };
   var LANGS = [['en', 'English'], ['ru', 'Русский'], ['de', 'Deutsch'], ['zh', '中文']];
@@ -1535,6 +1540,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var t = { id: uid(), title: '', desc: '', status: columns()[0].id, date: null, start: null, end: null, priority: null, estimate: null,
       area: null, order: Date.now(), source: 'user', created: new Date().toISOString() };
     for (var k in extra) t[k] = extra[k];
+    if (ui.autoColor && !t.color) { var i = ui.acNext || 0; t.color = COLORS[i % COLORS.length].id; ui.acNext = (i + 1) % COLORS.length; lsSet(UI_KEY, ui); }
     return t;
   }
   function endOf(t) { return t.end != null ? t.end : Math.min(1440, t.start + 60); }
@@ -2147,6 +2153,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       b.setAttribute('aria-pressed', String(calMode === m[0]));
       modes.appendChild(b);
     });
+    var ac = el('button', { class: 'tab ac', text: 'AC', title: tr('Автоцвет: новые карточки получают цвет автоматически'), 'aria-label': tr('Автоцвет: новые карточки получают цвет автоматически') });
+    ac.setAttribute('aria-pressed', String(!!ui.autoColor));
+    ac.addEventListener('click', function () { ui.autoColor = !ui.autoColor; lsSet(UI_KEY, ui); ac.setAttribute('aria-pressed', String(!!ui.autoColor)); });
+    modes.appendChild(ac);
     main.appendChild(el('div', { class: 'cal-bar' }, el('h2', { text: title }), prev, tod, next, modes));
     if (calMode === 'month') main.appendChild(monthGrid());
     else main.appendChild(timeGrid(calMode === 'day' ? 1 : 3));
