@@ -656,6 +656,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "Exercise",
     "Свернуть": "Collapse",
     "Развернуть": "Expand",
+    "Неделя": "Week",
     "Бесконечная лента: дни подряд, прокрутка вверх и вниз": "Endless feed: days one after another, scroll up and down",
     "Общие": "General",
     "Календарь и мышь": "Calendar & mouse",
@@ -928,6 +929,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "Sport",
     "Свернуть": "Einklappen",
     "Развернуть": "Ausklappen",
+    "Неделя": "Woche",
     "Бесконечная лента: дни подряд, прокрутка вверх и вниз": "Endlose Liste: Tage hintereinander, nach oben und unten scrollen",
     "Общие": "Allgemein",
     "Календарь и мышь": "Kalender & Maus",
@@ -1200,6 +1202,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "锻炼",
     "Свернуть": "折叠",
     "Развернуть": "展开",
+    "Неделя": "周",
     "Бесконечная лента: дни подряд, прокрутка вверх и вниз": "无限时间线：日期连续排列，可上下滚动",
     "Общие": "常规",
     "Календарь и мышь": "日历与鼠标",
@@ -1508,7 +1511,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   var index = {};
   var narrow = window.matchMedia('(max-width: 760px)');
   var mtab = 'cal';
-  var calMode = ['month', '3d', 'day', 'focus', 'infinite'].indexOf(ui.calMode) >= 0 ? ui.calMode : (narrow.matches ? 'day' : '3d');
+  var calMode = ['month', 'week', '3d', 'day', 'focus', 'infinite'].indexOf(ui.calMode) >= 0 ? ui.calMode : (narrow.matches ? 'day' : '3d');
   if ((calMode === 'focus' || calMode === 'infinite') && narrow.matches) calMode = 'day';
   var introFlag = true, introUntil = performance.now() + 2500;
   var calDate = new Date(today);
@@ -2055,6 +2058,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     return !!(a && $('view').contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName));
   }
   function softRender() { if (busy()) { needRender = true; return; } render(); }
+  function weekMonday(d) { return addDays(d, -((d.getDay() + 6) % 7)); }
   function visibleWeeks() {
     var ids = {}, s, e;
     if (calMode === 'month') {
@@ -2062,7 +2066,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       s = addDays(cm, -((cm.getDay() + 6) % 7)); e = addDays(s, 41);
     } else if (calMode === 'infinite') {
       var Wd = infHalf(); s = addDays(inf.base, inf.center - Wd); e = addDays(inf.base, inf.center + Wd);
-    } else { s = calDate; e = addDays(calDate, calMode === '3d' ? 2 : 0); }
+    } else { s = calDate; e = addDays(calDate, calMode === '3d' ? 2 : calMode === 'week' ? 6 : 0); }
     for (var d = new Date(s); d <= e; d = addDays(d, 7)) ids[weekId(d)] = 1;
     ids[weekId(e)] = 1; ids[weekId(today)] = 1;
     return Object.keys(ids).sort();
@@ -2150,6 +2154,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     if (!backend) { renderConnect(root); return; }
     if (calMode === 'focus') { if (narrow.matches) calMode = 'day'; else calDate = new Date(today); }
     if (calMode === 'infinite') { if (narrow.matches) calMode = 'day'; else if (!inf.base) inf.base = new Date(today); }
+    if (calMode === 'week') calDate = weekMonday(calDate);
     var weeks = visibleWeeks();
     weeks.forEach(function (w) { ensureFile(weekPath(w)); });
     ensureFile(P_INBOX); ensureFile(P_BOARD); ensureFile(P_PRESETS);
@@ -2744,6 +2749,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       calDate = same ? new Date(today) : new Date(calDate);
     }
     if (m === 'focus') calDate = new Date(today);
+    if (m === 'week') calDate = weekMonday(calDate);
     if (m === 'infinite') { inf.base = new Date(today); inf.center = 0; }
     calMode = m; ui.calMode = m; lsSet(UI_KEY, ui);
     introFlag = true; introUntil = performance.now() + 800;
@@ -2751,22 +2757,22 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   }
   function shift(dir) {
     if (calMode === 'month') calDate = new Date(calDate.getFullYear(), calDate.getMonth() + dir, 1);
-    else calDate = addDays(calDate, dir * (calMode === '3d' ? 3 : 1));
+    else calDate = addDays(calDate, dir * (calMode === 'week' ? 7 : calMode === '3d' ? 3 : 1));
     render();
   }
   function renderCal() {
     var wrap = el('div', { class: 'cal-wrap' });
     var main = el('div', { class: 'cal-main' });
     var title = calMode === 'month' ? cap(fmtMonth.format(calDate)) : (calMode === 'day' || calMode === 'focus') ? cap(fmtDay.format(calDate)) : calMode === 'infinite' ? cap(fmtMonth.format(addDays(inf.base || today, inf.center)))
-      : fmtShort.format(calDate) + ' – ' + fmtShort.format(addDays(calDate, 2));
+      : fmtShort.format(calDate) + ' – ' + fmtShort.format(addDays(calDate, calMode === 'week' ? 6 : 2));
     var prev = el('button', { class: 'btn', 'aria-label': tr('Назад'), text: '←', on: { click: function () { shift(-1); } } });
     var next = el('button', { class: 'btn', 'aria-label': tr('Вперёд'), text: '→', on: { click: function () { shift(1); } } });
     var tod = el('button', { class: 'btn', text: tr('Сегодня'), on: { click: function () {
-      calDate = calMode === 'month' ? new Date(today.getFullYear(), today.getMonth(), 1) : new Date(today);
+      calDate = calMode === 'month' ? new Date(today.getFullYear(), today.getMonth(), 1) : calMode === 'week' ? weekMonday(today) : new Date(today);
       gridScroll = Math.max(390, nowMin() - 120) * PPM; render();
     } } });
     var modes = el('div', { class: 'tabs modes' });
-    [['month', tr('Месяц')], ['3d', tr('3 дня')], ['day', tr('День')], ['focus', 'F'], ['infinite', 'I']].forEach(function (m) {
+    [['month', tr('Месяц')], ['week', tr('Неделя')], ['3d', tr('3 дня')], ['day', tr('День')], ['focus', 'F'], ['infinite', 'I']].forEach(function (m) {
       var b = el('button', { class: 'tab', text: m[1], title: m[0] === 'focus' ? tr('Фокус: только сегодня, календарь по центру') : m[0] === 'infinite' ? tr('Бесконечная лента: дни подряд, прокрутка вверх и вниз') : null, on: { click: function () { setMode(m[0]); } } });
       b.setAttribute('aria-pressed', String(calMode === m[0]));
       modes.appendChild(b);
@@ -2779,7 +2785,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     main.appendChild(el('div', { class: 'cal-bar' }, el('h2', { text: title }), focus ? null : prev, focus ? null : tod, focus ? null : next, modes));
     if (calMode === 'month') main.appendChild(monthGrid());
     else if (calMode === 'infinite') main.appendChild(infGrid());
-    else main.appendChild(timeGrid(calMode === 'day' || focus ? 1 : 3));
+    else main.appendChild(timeGrid(calMode === 'day' || focus ? 1 : calMode === 'week' ? 7 : 3));
     wrap.appendChild(main);
 
     var undated = all().filter(function (t) { return !t.date && matches(t); })
