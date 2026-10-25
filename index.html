@@ -630,6 +630,15 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "Exercise",
     "Свернуть": "Collapse",
     "Развернуть": "Expand",
+    "Подскок: размах масштаба": "Pop: scale overshoot",
+    "Подскок: поворот": "Pop: rotation",
+    "Подскок: смещение": "Pop: offset",
+    "Сила эффекта в процентах от максимума. Прозрачность не используется.": "Strength as a percentage of the maximum. No transparency is used.",
+    "Ширина календаря": "Calendar width",
+    "Доля экрана в обычном режиме, %.": "Share of the screen in the normal mode, %.",
+    "Ширина календаря в фокусе": "Calendar width in focus mode",
+    "Доля экрана в режиме F, %. Остаток делится поровну между пустой левой частью и канбаном.": "Share of the screen in mode F, %. The rest is split evenly between the empty left part and the board.",
+    "Общее время, за которое по очереди появятся все карточки в календаре и в канбане. 0 — без анимации.": "Total time in which all cards in the calendar and the board appear one after another. 0 = no animation.",
     "Фокус: только сегодня, календарь по центру": "Focus: today only, calendar in the center",
     "Появление карточек": "Card entrance",
     "Всплытие": "Rise",
@@ -864,6 +873,15 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "Sport",
     "Свернуть": "Einklappen",
     "Развернуть": "Ausklappen",
+    "Подскок: размах масштаба": "Pop: Größenüberschwung",
+    "Подскок: поворот": "Pop: Drehung",
+    "Подскок: смещение": "Pop: Versatz",
+    "Сила эффекта в процентах от максимума. Прозрачность не используется.": "Stärke in Prozent des Maximums. Es wird keine Transparenz verwendet.",
+    "Ширина календаря": "Kalenderbreite",
+    "Доля экрана в обычном режиме, %.": "Anteil des Bildschirms im normalen Modus, %.",
+    "Ширина календаря в фокусе": "Kalenderbreite im Fokusmodus",
+    "Доля экрана в режиме F, %. Остаток делится поровну между пустой левой частью и канбаном.": "Anteil des Bildschirms im Modus F, %. Der Rest wird gleichmäßig auf den leeren linken Teil und das Board verteilt.",
+    "Общее время, за которое по очереди появятся все карточки в календаре и в канбане. 0 — без анимации.": "Gesamtzeit, in der alle Karten in Kalender und Board nacheinander erscheinen. 0 = keine Animation.",
     "Фокус: только сегодня, календарь по центру": "Fokus: nur heute, Kalender in der Mitte",
     "Появление карточек": "Auftritt der Karten",
     "Всплытие": "Aufsteigen",
@@ -1098,6 +1116,15 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "锻炼",
     "Свернуть": "折叠",
     "Развернуть": "展开",
+    "Подскок: размах масштаба": "弹出：缩放幅度",
+    "Подскок: поворот": "弹出：旋转",
+    "Подскок: смещение": "弹出：位移",
+    "Сила эффекта в процентах от максимума. Прозрачность не используется.": "效果强度，为最大值的百分比。不使用透明度。",
+    "Ширина календаря": "日历宽度",
+    "Доля экрана в обычном режиме, %.": "普通模式下占屏幕的比例（%）。",
+    "Ширина календаря в фокусе": "专注模式下的日历宽度",
+    "Доля экрана в режиме F, %. Остаток делится поровну между пустой левой частью и канбаном.": "F 模式下占屏幕的比例（%）。其余部分由空白左侧和看板平分。",
+    "Общее время, за которое по очереди появятся все карточки в календаре и в канбане. 0 — без анимации.": "日历和看板中所有卡片依次出现所需的总时间。0 表示无动画。",
     "Фокус: только сегодня, календарь по центру": "专注：仅显示今天，日历居中",
     "Появление карточек": "卡片出场",
     "Всплытие": "上浮",
@@ -1332,7 +1359,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   var cfg = lsGet(CFG_KEY);
   var ui = lsGet(UI_KEY) || {};
   PPM = clamp(+ui.ppm || 1, 0.4, 8);
-  var DEFAULT_SETTINGS = { intro: 'rise', introMs: 450, sound: true, volume: 50, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
+  var DEFAULT_SETTINGS = { entrance: 'pop', entranceMs: 900, popScale: 25, popRot: 40, popMove: 40, calW: 50, calWF: 33, sound: true, volume: 50, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
     lang: 'en', device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'phone' : 'computer' };
   var settings = Object.assign({}, DEFAULT_SETTINGS, ui.settings || {});
   document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms');
@@ -1901,6 +1928,15 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     ids[weekId(e)] = 1; ids[weekId(today)] = 1;
     return Object.keys(ids).sort();
   }
+  // ширина календаря: доля экрана для обычного режима и для режима F
+  function applyColumns() {
+    var root = $('view'), focusOn = root.dataset.focus === '1';
+    if (focusOn) { var w = clamp(settings.calWF, 15, 70), side = (100 - w) / 2; root.style.gridTemplateColumns = 'minmax(0,' + side + 'fr) minmax(0,' + w + 'fr) minmax(0,' + side + 'fr)'; }
+    else {
+      var c = clamp(settings.calW, 20, 80), b = 100 - c;
+      root.style.gridTemplateColumns = settings.layout === 'right' ? 'minmax(0,' + b + 'fr) minmax(0,' + c + 'fr)' : 'minmax(0,' + c + 'fr) minmax(0,' + b + 'fr)';
+    }
+  }
   var lastView = '';
   function viewKey() { return [calMode, iso(calDate), PPM, settings.layout, mtab, query, ui.showRoutine ? 1 : 0, narrow.matches ? 1 : 0].join('|'); }
   function motionKey(n) { return (n.classList.contains('ev') ? 'e:' : 'c:') + n.dataset.id; }
@@ -1914,16 +1950,28 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   }
   // появление карточек при загрузке и смене режима: rise / pop / slide, длительность в настройках
   function playIntro() {
-    var ms = settings.introMs, nodes = $('view').querySelectorAll('.ev[data-id], .card, .chip, .col-mini');
+    var T = settings.entranceMs, v = settings.entrance, nodes = $('view').querySelectorAll('.ev[data-id], .card, .chip, .col-mini');
     if (!nodes.length) return false;
-    if (!(ms > 0)) return true;
-    var v = settings.intro, i = 0;
-    nodes.forEach(function (n) {
-      var kf, delay = Math.min(i++ * 16, 320);
-      if (v === 'pop') kf = [{ opacity: 0, transform: 'scale(.78)' }, { opacity: 1, transform: 'scale(1.05)', offset: .65 }, { opacity: 1, transform: 'scale(1)' }];
-      else if (v === 'slide') kf = [{ opacity: 0, transform: 'translateX(' + (n.closest('.pane-board') ? 30 : -30) + 'px)' }, { opacity: 1, transform: 'none' }];
-      else kf = [{ opacity: 0, transform: 'translateY(16px)' }, { opacity: 1, transform: 'none' }];
-      n.animate(kf, { duration: ms, delay: delay, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
+    if (!(T > 0)) return true;
+    var groups = { cal: [], board: [] };
+    nodes.forEach(function (n) { (n.closest('.pane-board') ? groups.board : groups.cal).push(n); });
+    var o = settings.popScale / 100 * 0.3, rot = settings.popRot / 100 * 20, mv = settings.popMove / 100 * 30;
+    // каждая группа (календарь и канбан) показывает карточки по очереди, обе группы идут одновременно
+    Object.keys(groups).forEach(function (g) {
+      var list = groups[g]; if (!list.length) return;
+      list.forEach(function (n) { var r = n.getBoundingClientRect(); n._ix = [Math.round(r.top / 8), r.left]; });
+      list.sort(function (a, b) { return a._ix[0] - b._ix[0] || a._ix[1] - b._ix[1]; });
+      var D = clamp(T / 3, 220, 520), step = list.length > 1 ? Math.max(0, (T - D) / (list.length - 1)) : 0;
+      list.forEach(function (n, i) {
+        var kf;
+        if (v === 'pop') kf = [
+          { transform: 'scale(0) rotate(' + (-rot) + 'deg) translateY(' + mv + 'px)' },
+          { transform: 'scale(' + (1 + o) + ') rotate(' + (rot * .4) + 'deg) translateY(' + (-mv * .2) + 'px)', offset: .6 },
+          { transform: 'scale(1) rotate(0deg) translateY(0)' }];
+        else if (v === 'slide') kf = [{ opacity: 0, transform: 'translateX(' + (g === 'board' ? 30 : -30) + 'px)' }, { opacity: 1, transform: 'none' }];
+        else kf = [{ opacity: 0, transform: 'translateY(16px)' }, { opacity: 1, transform: 'none' }];
+        n.animate(kf, { duration: D, delay: i * step, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'backwards' });
+      });
     });
     return true;
   }
@@ -1962,6 +2010,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     root.dataset.tab = mtab; root.dataset.layout = settings.layout;
     var focusOn = calMode === 'focus' && !narrow.matches;
     if (focusOn) root.dataset.focus = '1'; else delete root.dataset.focus;
+    applyColumns();
     var boardEl = renderBoard(weeks);
     if (focusOn) root.appendChild(el('section', { class: 'pane pane-empty' }));
     root.appendChild(el('section', { class: 'pane pane-cal', 'aria-label': tr('Календарь') }, renderCal()));
@@ -3007,6 +3056,13 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     r.addEventListener('input', function () { settings[key] = +r.value; out.textContent = settings[key] + ' px'; saveSettings(); });
     return el('div', { style: 'display:flex;align-items:center;gap:8px' }, r, out);
   }
+  function replayIntro() { introFlag = true; introUntil = performance.now() + 800; render(); }
+  function rngCtl(id, key, min, max, after) {
+    var r = el('input', { id: id, type: 'range', min: String(min), max: String(max), step: '1', value: String(settings[key]) });
+    var out = el('span', { class: 'hint', text: settings[key] + '%' });
+    r.addEventListener('input', function () { settings[key] = +r.value; out.textContent = settings[key] + '%'; saveSettings(); if (after) after(); });
+    return el('div', { style: 'display:flex;align-items:center;gap:8px' }, r, out);
+  }
   function pctCtl(id, key) {
     var r = el('input', { id: id, type: 'range', min: '0', max: '100', step: '5', value: String(settings[key]) });
     var out = el('span', { class: 'hint', text: settings[key] + '%' });
@@ -3064,16 +3120,21 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       row(tr('Колесо мыши в календаре'), 's-wheel', sel('s-wheel', settings.wheel, [['scroll', tr('Прокрутка (Alt — масштаб)')], ['zoom', tr('Масштаб времени (Alt — прокрутка)')]],
         function (v) { settings.wheel = v; }), tr('Масштаб растягивает сетку дня по вертикали вокруг курсора.')),
       row(tr('Календарь'), 's-layout', sel('s-layout', settings.layout, [['left', tr('Слева, канбан справа')], ['right', tr('Справа, канбан слева')]],
-        function (v) { settings.layout = v; $('view').dataset.layout = v; }), tr('Расположение двух частей на широком экране.')),
+        function (v) { settings.layout = v; $('view').dataset.layout = v; applyColumns(); }), tr('Расположение двух частей на широком экране.')),
       row(tr('Скольжение между днями'), 's-slide', msCtl('s-slide', 'slide', 2000, 100),
         tr('Как долго карточка плывёт в соседний день, когда вы тянете её в календаре. 0 — мгновенно.')),
       row(tr('Зона растягивания по краям блока'), 's-grip', pxCtl('s-grip', 'grip', 1, 12),
         tr('Сколько пикселей у верхнего и нижнего края блока в календаре занимает растягивание. Остальное: перенос.')),
       row(tr('Контур при наведении'), 's-hover', msCtl('s-hover', 'hover', 1000, 50, function () { document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms'); }),
         tr('Как быстро появляется и гаснет рамка вокруг карточки под курсором. 0 — мгновенно.')),
-      row(tr('Появление карточек'), 's-intro', sel('s-intro', settings.intro, [['rise', tr('Всплытие')], ['pop', tr('Подскок')], ['slide', tr('Сдвиг')]],
-        function (v) { settings.intro = v; introFlag = true; introUntil = performance.now() + 800; render(); }), tr('Как карточки появляются при загрузке и при смене режима.')),
-      row(tr('Длительность появления'), 's-introms', msCtl('s-introms', 'introMs', 1500, 50, function () { introFlag = true; introUntil = performance.now() + 800; render(); }), tr('0 — без анимации.')),
+      row(tr('Ширина календаря'), 's-calw', rngCtl('s-calw', 'calW', 25, 75, applyColumns), tr('Доля экрана в обычном режиме, %.')),
+      row(tr('Ширина календаря в фокусе'), 's-calwf', rngCtl('s-calwf', 'calWF', 20, 60, applyColumns), tr('Доля экрана в режиме F, %. Остаток делится поровну между пустой левой частью и канбаном.')),
+      row(tr('Появление карточек'), 's-intro', sel('s-intro', settings.entrance, [['pop', tr('Подскок')], ['rise', tr('Всплытие')], ['slide', tr('Сдвиг')]],
+        function (v) { settings.entrance = v; replayIntro(); }), tr('Как карточки появляются при загрузке и при смене режима.')),
+      row(tr('Длительность появления'), 's-introms', msCtl('s-introms', 'entranceMs', 3000, 100, replayIntro), tr('Общее время, за которое по очереди появятся все карточки в календаре и в канбане. 0 — без анимации.')),
+      row(tr('Подскок: размах масштаба'), 's-pops', rngCtl('s-pops', 'popScale', 0, 100, replayIntro), tr('Сила эффекта в процентах от максимума. Прозрачность не используется.')),
+      row(tr('Подскок: поворот'), 's-popr', rngCtl('s-popr', 'popRot', 0, 100, replayIntro)),
+      row(tr('Подскок: смещение'), 's-popm', rngCtl('s-popm', 'popMove', 0, 100, replayIntro)),
       row(tr('Звуки'), 's-sound', chk('s-sound', settings.sound, function (v) { settings.sound = v; if (v) sfx('save'); }), tr('Короткие звуки при создании, переносе, выполнении и удалении.')),
       row(tr('Громкость звуков'), 's-vol', pctCtl('s-vol', 'volume')),
       mode === 'local' ? null : row(tr('Сохранять после паузы'), 's-idle', sel('s-idle', settings.idle,
