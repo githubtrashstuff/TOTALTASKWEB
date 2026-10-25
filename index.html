@@ -2290,7 +2290,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     window.addEventListener('pointercancel', onCancel);
   }
   function evNode(t, lane, lanes, cols, keys, off, span, big) {
-    var node = el('div', { class: 'ev' + (isDone(t) ? ' done' : '') + (t.kind === 'routine' ? ' routine' : ''), data: { a: t.area }, tabindex: '0', title: t.title });
+    var node = el('div', { class: 'ev' + (isDone(t) ? ' done' : '') + (t.kind === 'routine' ? ' routine' : ''), data: { a: t.area, id: t.id }, tabindex: '0', title: t.title });
     var lb = labelBars(t); if (lb) node.appendChild(lb);
     node.appendChild(el('span', { class: 'ev-time' }));
     var row = el('span', { class: 'ev-row' }, stBtn(t), el('span', { class: 'ev-title', text: (t.priority ? 'P' + t.priority + ' · ' : '') + t.title }));
@@ -2323,8 +2323,17 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     var inp = el('input', { class: 'ev-input', placeholder: tr('Название'), 'aria-label': tr('Название задачи'), maxlength: '200' });
     ghost.classList.add('editing'); ghost.appendChild(inp);
     var done = false;
+    function outside(e) {
+      if (ghost.contains(e.target)) return;
+      var colHit = e.target.closest && e.target.closest('.tg-col');
+      var creating = colHit && ((e.button === 0 && e.target === colHit) || e.button === 2);
+      finish(true);
+      if (!creating) e.stopPropagation();
+    }
+    window.addEventListener('pointerdown', outside, true);
     function finish(commit) {
       if (done) return; done = true; inlineCur = null;
+      window.removeEventListener('pointerdown', outside, true);
       var v = inp.value.trim();
       ghost.remove(); interacting = false;
       if (commit && v) commitTask(newDraft({ title: v, date: key, start: a, end: b }));
@@ -2365,8 +2374,9 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     scroller.appendChild(top);
     var zoomRaf = 0;
     scroller.addEventListener('contextmenu', function (e) { if (!e.target.closest('.ev, .chip')) e.preventDefault(); });
+    scroller.addEventListener('mousedown', function (e) { if (e.button === 1) e.preventDefault(); });
     scroller.addEventListener('pointerdown', function (e) {
-      if (e.button !== 2 || e.target.closest('.ev, .chip, .add-day, .tg-top')) return;
+      if (e.button !== 1 || e.target.closest('.tg-top')) return;
       e.preventDefault();
       var y0 = e.clientY, st0 = scroller.scrollTop;
       document.body.classList.add('is-dragging');
@@ -2402,13 +2412,19 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
         d.date = key; d.start = s; d.end = s + dur; commitTask(d);
       });
       col.addEventListener('pointerdown', function (e) {
-        if (e.button !== 0 || e.target !== col || e.pointerType === 'touch') return;
-        e.preventDefault();
-        var c = col;
-        if (inlineCur) { inlineCur.finish(true); c = document.querySelectorAll('.tg-col')[ci] || col; }
+        var rmb = e.button === 2;
+        if (!(rmb || (e.button === 0 && e.target === col)) || e.pointerType === 'touch') return;
+        if (rmb && e.target.closest('.add-day')) return;
+        if (!rmb) e.preventDefault();
+        if (inlineCur) inlineCur.finish(true);
+        var c = document.querySelectorAll('.tg-col')[ci] || col;
         interacting = true;
         var startM = clamp(snap(minAt(c, e.clientY), e.ctrlKey), 0, 1439);
         var y0 = e.clientY, moved = false, ghost = null, a = startM, b = startM + 1;
+        var evTarget = rmb ? e.target.closest('.ev') : null;
+        var blockCtx = function (ev) { ev.preventDefault(); ev.stopPropagation(); };
+        if (rmb) window.addEventListener('contextmenu', blockCtx, true);
+        function unblock() { if (rmb) setTimeout(function () { window.removeEventListener('contextmenu', blockCtx, true); }, 400); }
         function stop() { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); }
         function onMove(ev) {
           if (!moved) {
@@ -2421,9 +2437,14 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
           a = Math.min(startM, m); b = Math.max(startM, m); if (b - a < 1) b = a + 1;
           paintEv(ghost, a, b);
         }
-        function onUp() {
-          stop();
-          if (!moved) { interacting = false; endInteraction(); return; }
+        function onUp(ev) {
+          stop(); unblock();
+          if (!moved) {
+            interacting = false; endInteraction();
+            if (rmb && evTarget && evTarget.dataset.id) ctxMenu(ev, evTarget.dataset.id);
+            return;
+          }
+
           if (b - a < 15) b = Math.min(1440, a + 15);
           if (b - a < 15) a = b - 15;
           paintEv(ghost, a, b);
