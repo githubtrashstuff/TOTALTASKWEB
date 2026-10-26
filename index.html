@@ -486,6 +486,9 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
   /* ---------- язык ---------- */
   var I18N = {
    "en": {
+    "Экспорт настроек": "Export settings",
+    "Импорт настроек": "Import settings",
+    "Не удалось прочитать файл настроек.": "Could not read the settings file.",
     "Горячие клавиши и управление": "Hotkeys and controls",
     "Только для версии на компьютере.": "Desktop version only.",
     "Справка": "Help",
@@ -817,6 +820,9 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
     "0 — без анимации.": "0 = no animation."
    },
    "de": {
+    "Экспорт настроек": "Einstellungen exportieren",
+    "Импорт настроек": "Einstellungen importieren",
+    "Не удалось прочитать файл настроек.": "Einstellungsdatei konnte nicht gelesen werden.",
     "Горячие клавиши и управление": "Tastenkürzel und Bedienung",
     "Только для версии на компьютере.": "Nur für die Desktop-Version.",
     "Справка": "Hilfe",
@@ -1148,6 +1154,9 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
     "0 — без анимации.": "0 = keine Animation."
    },
    "zh": {
+    "Экспорт настроек": "导出设置",
+    "Импорт настроек": "导入设置",
+    "Не удалось прочитать файл настроек.": "无法读取设置文件。",
     "Горячие клавиши и управление": "快捷键与操作",
     "Только для версии на компьютере.": "仅适用于电脑版。",
     "Справка": "帮助",
@@ -3786,6 +3795,26 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
       var blob = new Blob([JSON.stringify(backend.exportAll(), null, 2)], { type: 'application/json' }), a = el('a', { href: URL.createObjectURL(blob), download: 'totaltask-backup-' + todayISO + '.json' });
       document.body.appendChild(a); a.click(); a.remove();
     } } }) : null;
+    var setExp = el('button', { class: 'btn', text: tr('Экспорт настроек'), on: { click: function () {
+      var o = Object.assign({}, settings); delete o.device;
+      var blob = new Blob([JSON.stringify({ totaltaskSettings: 1, settings: o }, null, 2)], { type: 'application/json' }), a = el('a', { href: URL.createObjectURL(blob), download: 'totaltask-settings.json' });
+      document.body.appendChild(a); a.click(); a.remove();
+    } } });
+    var setFile = el('input', { type: 'file', accept: 'application/json,.json', hidden: true });
+    setFile.addEventListener('change', function () {
+      var f = setFile.files && setFile.files[0]; if (!f) return;
+      var r = new FileReader();
+      r.onload = function () {
+        try {
+          var o = JSON.parse(r.result), src = o && o.totaltaskSettings ? o.settings : null;
+          if (!src || typeof src !== 'object') throw 0;
+          Object.keys(DEFAULT_SETTINGS).forEach(function (k) { if (k !== 'device' && k in src && typeof src[k] === typeof DEFAULT_SETTINGS[k]) settings[k] = src[k]; });
+          saveSettings(); location.reload();
+        } catch (er) { sfx('error'); alert(tr('Не удалось прочитать файл настроек.')); }
+      };
+      r.readAsText(f);
+    });
+    var setImp = el('button', { class: 'btn', text: tr('Импорт настроек'), on: { click: function () { setFile.click(); } } });
     var n = actions.length;
     showModal(tr('Настройки'), [
       el('h2', { text: tr('Настройки') }), el('p', { class: 'hint', text: info }),
@@ -3855,7 +3884,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
         tr('Как часто подтягивать правки Claude и других устройств. Также проверяется при возврате на вкладку.')),
       row(tr('Имя устройства'), 's-device', device, tr('Пишется в коммит, чтобы было видно, откуда правка.'))
       ]),
-      el('div', { class: 'actions' }, saveNow, exportBtn, el('span', { class: 'spacer' }), out,
+      el('div', { class: 'actions' }, saveNow, exportBtn, setExp, setImp, setFile, el('span', { class: 'spacer' }), out,
         el('button', { class: 'btn', text: tr('Закрыть'), on: { click: closeModal } }))
     ]);
   }
