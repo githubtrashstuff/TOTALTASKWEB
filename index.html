@@ -424,6 +424,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
   .tg { border: 0; border-radius: 0; scrollbar-width: none; -ms-overflow-style: none; }
   .tg::-webkit-scrollbar { display: none; width: 0; height: 0; }
   .inf-dh .add-day { display: none; }
+  .ev, .chip, .card { pointer-events: none !important; }
   .connect { margin: max(16px, env(safe-area-inset-top, 0px)) 12px 24px; max-width: none; }
   .top { gap: 8px; }
   .top .search, #new-task, #btn-claude { display: none !important; }
@@ -2817,7 +2818,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
     }
     var c = el('button', { class: 'card' + (isDone(t) ? ' done' : ''), data: { id: t.id, a: t.color ? null : t.area } }, lbls,
       el('div', { class: 'card-head' }, stBtn(t), el('span', { class: 'card-title', text: t.title })), meta.childNodes.length ? meta : null);
-    c.addEventListener('click', function (e) { if (e.shiftKey) unschedule(t.id); else openTask(t.id); });
+    c.addEventListener('click', function (e) { if (e.shiftKey && e.altKey) removeTask(t.id); else if (e.shiftKey) unschedule(t.id); else openTask(t.id); });
     c.addEventListener('contextmenu', function (e) { ctxMenu(e, t.id); });
     paintCard(c, t);
     attachDrag(c, t.id);
@@ -3476,7 +3477,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
     if (focusEl && !narrow.matches) focusEl.focus();
   }
   function field(label, id, control) { return el('div', { class: 'field' }, el('label', { for: id, text: label }), control); }
-  function openTask(id) { var d = draftOf(id); if (d) taskModal(d, false); }
+  function openTask(id) { if (narrow.matches) return; var d = draftOf(id); if (d) taskModal(d, false); }
   function openNew(extra) { taskModal(newDraft(extra || {}), true); }
   function taskModal(task, isNew) {
     var title = el('input', { id: 'f-title', type: 'text', value: task.title, placeholder: tr('Что нужно сделать') });
