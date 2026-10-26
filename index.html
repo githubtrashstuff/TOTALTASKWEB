@@ -3029,16 +3029,6 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
     else main.appendChild(timeGrid(calMode === 'day' || focus ? 1 : calMode === 'week' ? 7 : 3));
     wrap.appendChild(main);
 
-    var undated = all().filter(function (t) { return !t.date && matches(t); })
-      .sort(function (a, b) { return (a.priority || 9) - (b.priority || 9) || (a.order || 0) - (b.order || 0); });
-    var inbox = el('aside', { class: 'inbox' },
-      el('h3', { text: tr('Inbox, без даты') }, el('span', { class: 'count', text: String(undated.length) })),
-      undated.length ? null : el('p', { text: tr('Пусто. Новые задачи без даты попадают сюда, Claude распределяет их при разборе.') }));
-    var list = el('div', { class: 'inbox-list' });
-    undated.forEach(function (t) { list.appendChild(chipNode(t)); });
-    inbox.appendChild(list);
-    setDrop(inbox, function (id) { var d = getDraft(id); if (!d) return; d.date = null; d.start = null; d.end = null; commitTask(d); });
-    wrap.appendChild(inbox);
     return wrap;
   }
   function monthGrid() {
