@@ -2,10 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F6F3F2" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#18151A" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="TOTALTASK">
 <link rel="manifest" href="manifest.webmanifest">
@@ -384,11 +385,29 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .report { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; white-space: pre-wrap; font-size: 13px; max-height: 50vh; overflow: auto; overflow-wrap: anywhere; }
 .cmd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; background: var(--col); padding: 8px 10px; border-radius: 8px; overflow-wrap: anywhere; user-select: all; }
 
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
+@media (pointer: coarse) {
+  html, body { overscroll-behavior: none; touch-action: manipulation; }
+  .tg, .tg * { touch-action: pan-y; }
+  .ev { touch-action: pan-y; }
+  .tg-col, .ev, .card, .chip { -webkit-touch-callout: none; }
+  .card, .chip, .ev { outline: none !important; transition: none !important; }
+}
+.connect input, .connect select { font-size: 16px; }
+.token-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.token-row input { flex: 1 1 100%; min-width: 0; }
+.token-row .btn { flex: 1 1 auto; justify-content: center; }
+.gh-steps { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ok-note { color: var(--ok); font-size: 13px; }
 @media (max-width: 760px) {
   .top { gap: 8px; }
+  .top .search, #new-task, #btn-claude { display: none !important; }
+  .modes .tab.hide-m, .modes .hide-m { display: none !important; }
+  .inbox { display: none; }
+  .cal-bar { gap: 6px; }
+  .tabs.modes { margin-left: 0; }
   .top .brand { font-size: 18px; }
   .top .mtabs { display: flex; order: 9; }
-  .top .search { order: 10; flex: 1 1 140px; width: auto; }
   .sync { font-size: 0; gap: 0; padding: 6px; }
   .top .btn { padding: 6px 10px; }
   .cal-bar h2 { flex: 1 1 100%; font-size: 17px; }
@@ -396,7 +415,6 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   .split { display: block; height: auto; min-height: 0; }
   .split[data-tab="cal"] .pane-board, .split[data-tab="board"] .pane-cal { display: none; }
   .pane { height: calc(100dvh - var(--top, 110px) - 14px - env(safe-area-inset-top, 0px) - max(12px, env(safe-area-inset-bottom, 0px))); min-height: 420px; }
-  .inbox { max-height: 120px; }
 }
 @media (prefers-reduced-motion: no-preference) { .card, .chip, .btn { transition: border-color .12s, background .12s; } }
 </style>
@@ -661,6 +679,12 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "Exercise",
     "Свернуть": "Collapse",
     "Развернуть": "Expand",
+    "Вставить из буфера": "Paste from clipboard",
+    "Вставлено из буфера": "Pasted from clipboard",
+    "В буфере нет токена. Скопируйте его и нажмите ещё раз или вставьте вручную.": "No token on the clipboard. Copy it and tap again, or paste it manually.",
+    "Показать": "Show",
+    "Скрыть": "Hide",
+    "Создать токен на GitHub ↗": "Create a token on GitHub ↗",
     "Неделя": "Week",
     "Бесконечная лента: дни подряд, прокрутка вверх и вниз": "Endless feed: days one after another, scroll up and down",
     "Общие": "General",
@@ -934,6 +958,12 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "Sport",
     "Свернуть": "Einklappen",
     "Развернуть": "Ausklappen",
+    "Вставить из буфера": "Aus Zwischenablage einfügen",
+    "Вставлено из буфера": "Aus der Zwischenablage eingefügt",
+    "В буфере нет токена. Скопируйте его и нажмите ещё раз или вставьте вручную.": "Kein Token in der Zwischenablage. Kopiere ihn und tippe erneut oder füge ihn manuell ein.",
+    "Показать": "Anzeigen",
+    "Скрыть": "Verbergen",
+    "Создать токен на GitHub ↗": "Token auf GitHub erstellen ↗",
     "Неделя": "Woche",
     "Бесконечная лента: дни подряд, прокрутка вверх и вниз": "Endlose Liste: Tage hintereinander, nach oben und unten scrollen",
     "Общие": "Allgemein",
@@ -1207,6 +1237,12 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     "Зарядка": "锻炼",
     "Свернуть": "折叠",
     "Развернуть": "展开",
+    "Вставить из буфера": "从剪贴板粘贴",
+    "Вставлено из буфера": "已从剪贴板粘贴",
+    "В буфере нет токена. Скопируйте его и нажмите ещё раз или вставьте вручную.": "剪贴板中没有令牌。请复制后再点一次，或手动粘贴。",
+    "Показать": "显示",
+    "Скрыть": "隐藏",
+    "Создать токен на GitHub ↗": "在 GitHub 创建令牌 ↗",
     "Неделя": "周",
     "Бесконечная лента: дни подряд, прокрутка вверх и вниз": "无限时间线：日期连续排列，可上下滚动",
     "Общие": "常规",
@@ -1496,7 +1532,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   var cfg = lsGet(CFG_KEY);
   var ui = lsGet(UI_KEY) || {};
   PPM = clamp(+ui.ppm || 1, 0.4, 64);
-  var DEFAULT_SETTINGS = { entrance: 'pop', entranceMs: 900, popScale: 25, popRot: 40, popMove: 40, calW: 50, calWF: 33, zoomMs: 160, tNight: 58, tWork: 70, tDinner: 70, placeFx: 'pop', sound: true, volume: 50, hoverVol: 25, hoverShift: 0, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
+  var DEFAULT_SETTINGS = { entrance: 'pop', entranceMs: 900, popScale: 25, popRot: 40, popMove: 40, calW: 50, calWF: 33, zoomMs: 160, tNight: 58, tWork: 70, tDinner: 70, placeFx: 'pop', sound: !window.matchMedia('(pointer: coarse)').matches, volume: 50, hoverVol: 25, hoverShift: 0, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
     lang: 'en', device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'phone' : 'computer' };
   var settings = Object.assign({}, DEFAULT_SETTINGS, ui.settings || {});
   document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms');
@@ -1516,8 +1552,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   var index = {};
   var narrow = window.matchMedia('(max-width: 760px)');
   var mtab = 'cal';
-  var calMode = ['month', 'week', '3d', 'day', 'focus', 'infinite'].indexOf(ui.calMode) >= 0 ? ui.calMode : (narrow.matches ? 'day' : '3d');
-  if ((calMode === 'focus' || calMode === 'infinite') && narrow.matches) calMode = 'day';
+  var calMode = ['month', 'week', '3d', 'day', 'focus', 'infinite'].indexOf(ui.calMode) >= 0 ? ui.calMode : (narrow.matches ? 'infinite' : '3d');
+  if (calMode === 'focus' && narrow.matches) calMode = 'infinite';
   var introFlag = true, introUntil = performance.now() + 2500;
   var calDate = new Date(today);
   var gridScroll = Math.max(390, nowMin() - 120) * PPM;
@@ -2157,8 +2193,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     needRender = false;
     var root = $('view');
     if (!backend) { renderConnect(root); return; }
-    if (calMode === 'focus') { if (narrow.matches) calMode = 'day'; else calDate = new Date(today); }
-    if (calMode === 'infinite') { if (narrow.matches) calMode = 'day'; else if (!inf.base) inf.base = new Date(today); }
+    if (calMode === 'focus') { if (narrow.matches) calMode = 'infinite'; else calDate = new Date(today); }
+    if (calMode === 'infinite' && !inf.base) inf.base = new Date(today);
     if (calMode === 'week') calDate = weekMonday(calDate);
     var weeks = visibleWeeks();
     weeks.forEach(function (w) { ensureFile(weekPath(w)); });
@@ -2186,8 +2222,9 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     root.querySelectorAll('.ev').forEach(fitDesc);
     var introPlayed = false;
     var loadingAny = Object.keys(files).some(function (k) { return files[k].state === 'loading'; });
-    if (introFlag && !(loadingAny && performance.now() < introUntil)) { introPlayed = playIntro(); if (introPlayed || performance.now() > introUntil) introFlag = false; }
-    if (!introPlayed) playMotion(prevRects);
+    if (narrow.matches) { introFlag = false; }
+    else if (introFlag && !(loadingAny && performance.now() < introUntil)) { introPlayed = playIntro(); if (introPlayed || performance.now() > introUntil) introFlag = false; }
+    if (!introPlayed && !narrow.matches) playMotion(prevRects);
     $('mt-cal').setAttribute('aria-pressed', String(mtab === 'cal'));
     $('mt-board').setAttribute('aria-pressed', String(mtab === 'board'));
     setSync();
@@ -2211,7 +2248,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   }
   function dragDown(e, node, id) {
     if (drag || dragId || (e.pointerType === 'mouse' && e.button !== 0) || (e.target.closest && e.target.closest('.st'))) return;
-    var touch = e.pointerType !== 'mouse', pid = e.pointerId, x0 = e.clientX, y0 = e.clientY, timer = null;
+    if (e.pointerType !== 'mouse') return;   // на сенсорных экранах только просмотр: без перетаскивания
+    var touch = false, pid = e.pointerId, x0 = e.clientX, y0 = e.clientY, timer = null;
     function off() {
       clearTimeout(timer);
       window.removeEventListener('pointermove', pre); window.removeEventListener('pointerup', off); window.removeEventListener('pointercancel', off);
@@ -2779,11 +2817,11 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     } } });
     var modes = el('div', { class: 'tabs modes' });
     [['month', tr('Месяц')], ['week', tr('Неделя')], ['3d', tr('3 дня')], ['day', tr('День')], ['focus', 'F'], ['infinite', 'I']].forEach(function (m) {
-      var b = el('button', { class: 'tab', text: m[1], title: m[0] === 'focus' ? tr('Фокус: только сегодня, календарь по центру') : m[0] === 'infinite' ? tr('Бесконечная лента: дни подряд, прокрутка вверх и вниз') : null, on: { click: function () { setMode(m[0]); } } });
+      var b = el('button', { class: 'tab' + (m[0] === 'focus' ? ' hide-m' : ''), text: m[1], title: m[0] === 'focus' ? tr('Фокус: только сегодня, календарь по центру') : m[0] === 'infinite' ? tr('Бесконечная лента: дни подряд, прокрутка вверх и вниз') : null, on: { click: function () { setMode(m[0]); } } });
       b.setAttribute('aria-pressed', String(calMode === m[0]));
       modes.appendChild(b);
     });
-    var ac = el('button', { class: 'tab ac', text: 'AC', title: tr('Автоцвет: новые карточки получают цвет автоматически'), 'aria-label': tr('Автоцвет: новые карточки получают цвет автоматически') });
+    var ac = el('button', { class: 'tab ac hide-m', text: 'AC', title: tr('Автоцвет: новые карточки получают цвет автоматически'), 'aria-label': tr('Автоцвет: новые карточки получают цвет автоматически') });
     ac.setAttribute('aria-pressed', String(!!ui.autoColor));
     ac.addEventListener('click', function () { sfx('tick'); ui.autoColor = !ui.autoColor; lsSet(UI_KEY, ui); ac.setAttribute('aria-pressed', String(!!ui.autoColor)); });
     modes.appendChild(ac);
@@ -2937,8 +2975,16 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   // minute под курсором запоминается в момент колеса и удерживается на месте всё время анимации
   function zoomBy(dy, clientY) {
     var tg = document.querySelector('.tg'); if (!tg) return;
-    var top = tg.querySelector('.tg-top'), r = tg.getBoundingClientRect();
     if (sscroll.raf) { cancelAnimationFrame(sscroll.raf); sscroll.raf = 0; }
+    zoomPoint(tg, clientY);
+    zoom.target = clamp((zoom.raf ? zoom.target : PPM) * Math.exp(-dy * 0.0045), minPPM(), 64);
+    sfx('slot');
+    if (settings.zoomMs <= 0) { applyZoom(zoom.target); zoomAnchor(); zoomDone(); return; }
+    if (!zoom.raf) { zoom.last = performance.now(); zoom.raf = requestAnimationFrame(zoomTick); }
+  }
+  // запомнить точку под пальцем или курсором: прокрутка = A·масштаб + B
+  function zoomPoint(tg, clientY) {
+    var top = tg.querySelector('.tg-top'), r = tg.getBoundingClientRect();
     zoom.yy = clientY - r.top;
     if (tg.classList.contains('inf')) {
       // дни стоят друг под другом: точка = (1440·день + минута)·масштаб + (день+1)·высота заголовка
@@ -2949,10 +2995,6 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       zoom.am = (tg.scrollTop + zoom.yy - (top ? top.offsetHeight : 0)) / PPM;
       zoom.A = zoom.am; zoom.B = (top ? top.offsetHeight : 0) - zoom.yy;
     }
-    zoom.target = clamp((zoom.raf ? zoom.target : PPM) * Math.exp(-dy * 0.0045), minPPM(), 64);
-    sfx('slot');
-    if (settings.zoomMs <= 0) { applyZoom(zoom.target); zoomAnchor(); zoomDone(); return; }
-    if (!zoom.raf) { zoom.last = performance.now(); zoom.raf = requestAnimationFrame(zoomTick); }
   }
   // плавный переход к заданному масштабу и позиции прокрутки (Tab)
   function zoomTo(p1, s1) {
@@ -3117,7 +3159,8 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
       return y <= g ? 'top' : r.height - y <= g ? 'bottom' : 'move';
     }
     node.addEventListener('pointermove', function (e) { if (!interacting) node.style.cursor = zone(e) === 'move' ? '' : 'ns-resize'; });
-    node.addEventListener('pointerdown', function (e) { if (e.target.closest('.st')) return; evDown(e, t, node, zone(e), cols, keys); });
+    node.addEventListener('pointerdown', function (e) { if (e.pointerType === 'touch') { node._touched = true; return; } if (e.target.closest('.st')) return; evDown(e, t, node, zone(e), cols, keys); });
+    node.addEventListener('click', function (e) { if (node._touched) { node._touched = false; if (!e.target.closest('.st')) openTask(t.id); } });
     node.addEventListener('keydown', function (e) { if (e.key === 'Enter') openTask(t.id); });
     node.addEventListener('contextmenu', function (e) { ctxMenu(e, t.id); });
     paintCard(node, t);
@@ -3203,7 +3246,44 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
         window.addEventListener('pointerup', onUp);
       });
     }
+  // сенсорный экран: щипок двумя пальцами меняет масштаб вокруг центра пальцев (и двигает ленту), двойное касание прыгает к текущему времени
+  function touchSetup(scroller) {
+    var pin = null, tap = null;
+    function dist(a, b) { return Math.max(30, Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)); }
+    function pinMove(e) {
+      if (!pin || e.touches.length < 2) return;
+      e.preventDefault();
+      var a = e.touches[0], b = e.touches[1], mid = (a.clientY + b.clientY) / 2;
+      zoom.B = pin.B0 - (mid - pin.mid0);
+      applyZoom(clamp(pin.p0 * dist(a, b) / pin.d0, minPPM(), 64)); zoomAnchor();
+    }
+    function pinEnd(e) {
+      if (!pin || (e && e.touches && e.touches.length >= 2)) return;
+      scroller.removeEventListener('touchmove', pinMove);
+      scroller.style.overflowY = ''; pin = null; zoomDone();
+    }
+    scroller.addEventListener('touchstart', function (e) {
+      if (e.touches.length !== 2) return;
+      if (sscroll.raf) { cancelAnimationFrame(sscroll.raf); sscroll.raf = 0; }
+      if (zoom.raf) { cancelAnimationFrame(zoom.raf); zoom.raf = 0; }
+      var a = e.touches[0], b = e.touches[1], mid = (a.clientY + b.clientY) / 2;
+      zoomPoint(scroller, mid);
+      pin = { d0: dist(a, b), p0: PPM, mid0: mid, B0: zoom.B };
+      scroller.style.overflowY = 'hidden';   // родная прокрутка на время щипка выключена
+      scroller.addEventListener('touchmove', pinMove, { passive: false });
+    }, { passive: true });
+    scroller.addEventListener('touchend', function (e) {
+      pinEnd(e);
+      if (e.touches.length || e.changedTouches.length !== 1) return;
+      var t = e.changedTouches[0], now = performance.now();
+      if (e.target.closest && e.target.closest('.ev, .chip, .add-day, button, a')) { tap = null; return; }
+      if (tap && now - tap.t < 320 && Math.hypot(t.clientX - tap.x, t.clientY - tap.y) < 30) { tap = null; scrollToNow(); }
+      else tap = { t: now, x: t.clientX, y: t.clientY };
+    }, { passive: true });
+    scroller.addEventListener('touchcancel', function () { pinEnd(null); }, { passive: true });
+  }
   function scrollerEvents(scroller) {
+    touchSetup(scroller);
     scroller.addEventListener('scroll', labelWatch);
     scroller.addEventListener('contextmenu', function (e) { if (!e.target.closest('.ev, .chip')) e.preventDefault(); });
     scroller.addEventListener('mousedown', function (e) { if (e.button === 1) e.preventDefault(); });
@@ -3576,7 +3656,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     root.className = ''; root.textContent = '';
     var owner = el('input', { id: 'c-owner', value: 'githubtrashstuff', autocomplete: 'off' });
     var repo = el('input', { id: 'c-repo', value: 'TOTALTASK', autocomplete: 'off' });
-    var token = el('input', { id: 'c-token', type: 'password', placeholder: 'github_pat_…', autocomplete: 'off' });
+    var token = el('input', { id: 'c-token', type: 'password', placeholder: 'github_pat_…', autocomplete: 'off', autocapitalize: 'off', autocorrect: 'off', spellcheck: 'false', inputmode: 'text' });
     var err = el('div', { class: 'err', hidden: true });
     var go = el('button', { class: 'btn primary', text: tr('Подключить') });
     function connect() {
@@ -3594,31 +3674,58 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
     }
     go.addEventListener('click', connect);
     token.addEventListener('keydown', function (e) { if (e.key === 'Enter') connect(); });
+    // вставка из буфера: токен, ссылка на репозиторий или «владелец/репозиторий» распознаются сами
+    var note = el('div', { class: 'ok-note', hidden: true });
+    function applyClip(text) {
+      var t = (text || '').trim(), hit = false, m;
+      if ((m = /(github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,})/.exec(t))) { token.value = m[1]; hit = true; }
+      else if ((m = /github\.com\/([^\/\s]+)\/([^\/\s#?]+)/.exec(t)) || (m = /^([\w.-]+)\/([\w.-]+)$/.exec(t))) { owner.value = m[1]; repo.value = m[2].replace(/\.git$/, ''); hit = true; }
+      if (hit) { note.hidden = false; note.textContent = tr('Вставлено из буфера'); if (token.value && owner.value && repo.value) go.focus(); }
+      return hit;
+    }
+    function pasteNow(silent) {
+      if (!navigator.clipboard || !navigator.clipboard.readText) { if (!silent) token.focus(); return; }
+      navigator.clipboard.readText().then(function (t) { if (!applyClip(t) && !silent) { err.hidden = false; err.textContent = tr('В буфере нет токена. Скопируйте его и нажмите ещё раз или вставьте вручную.'); } }, function () { if (!silent) token.focus(); });
+    }
+    [owner, repo, token].forEach(function (i) { i.addEventListener('paste', function (e) { var t = (e.clipboardData || window.clipboardData).getData('text'); if (applyClip(t)) e.preventDefault(); }); });
+    var pasteBtn = el('button', { type: 'button', class: 'btn', text: tr('Вставить из буфера') });
+    pasteBtn.addEventListener('click', function () { err.hidden = true; pasteNow(false); });
+    var eye = el('button', { type: 'button', class: 'btn', text: tr('Показать'), 'aria-label': tr('Показать') });
+    eye.addEventListener('click', function () { var show = token.type === 'password'; token.type = show ? 'text' : 'password'; eye.textContent = show ? tr('Скрыть') : tr('Показать'); });
+    var mk = el('a', { class: 'btn', href: 'https://github.com/settings/personal-access-tokens/new', target: '_blank', rel: 'noopener', text: tr('Создать токен на GitHub ↗') });
     var form = el('div', { class: 'gh-form', hidden: true },
       el('p', { class: 'hint', text: tr('Создайте для этого репозитория токен с доступом Contents: Read and write. Токен останется только в этом браузере.') }),
+      el('div', { class: 'gh-steps' }, mk),
+      field(tr('Токен GitHub'), 'c-token', el('div', { class: 'token-row' }, token, pasteBtn, eye)), note,
       el('div', { class: 'row2' }, field(tr('Владелец'), 'c-owner', owner), field(tr('Репозиторий'), 'c-repo', repo)),
-      field(tr('Токен GitHub'), 'c-token', token), err, el('div', { class: 'actions' }, go));
+      err, el('div', { class: 'actions' }, go));
     var ghBtn = el('button', { class: 'btn', text: tr('Подключить GitHub') });
-    ghBtn.addEventListener('click', function () { form.hidden = !form.hidden; if (!form.hidden) owner.focus(); });
+    function openForm() { form.hidden = false; ghBtn.hidden = true; pasteNow(true); token.focus(); }
+    ghBtn.addEventListener('click', openForm);
     var localBtn = el('button', { class: 'btn primary', text: tr('Начать локально') });
     localBtn.addEventListener('click', function () { cfg = { mode: 'local' }; lsSet(CFG_KEY, cfg); start(new LocalBackend(), 'local'); });
     var lang = el('select', { id: 'c-lang', 'aria-label': 'Language' });
     LANGS.forEach(function (l) { var o = el('option', { value: l[0], text: l[1] }); if (l[0] === LANG) o.selected = true; lang.appendChild(o); });
     lang.addEventListener('change', function () { settings.lang = lang.value; saveSettings(); setLang(lang.value); renderConnect(root); });
+    var localCard = el('div', { class: 'choice primary' },
+      el('div', { class: 'choice-head' }, el('h2', { text: tr('Локально') }), el('span', { class: 'badge', text: tr('Рекомендуем') })),
+      el('p', { text: tr('Всё остаётся в этом браузере. Без аккаунта, работает без интернета. Другие устройства и Claude эти данные не увидят.') }),
+      el('div', { class: 'actions' }, localBtn));
+    var ghCard = el('div', { class: 'choice' },
+      el('div', { class: 'choice-head' }, el('h2', { text: tr('Бесплатная синхронизация через GitHub') }), el('span', { class: 'badge', text: 'Free sync' })),
+      el('p', { text: tr('Задачи лежат в вашем приватном репозитории GitHub: они одинаковы на всех устройствах, у них есть история, и с ними может работать Claude.') }),
+      el('div', { class: 'actions' }, ghBtn), form);
+    // на телефоне главное это подключиться к своим данным: синхронизация первой и сразу раскрыта
     root.appendChild(el('div', { class: 'connect' },
       el('div', { class: 'connect-top' }, el('h1', { text: tr('Где хранить задачи?') }), lang),
-      el('div', { class: 'choice primary' },
-        el('div', { class: 'choice-head' }, el('h2', { text: tr('Локально') }), el('span', { class: 'badge', text: tr('Рекомендуем') })),
-        el('p', { text: tr('Всё остаётся в этом браузере. Без аккаунта, работает без интернета. Другие устройства и Claude эти данные не увидят.') }),
-        el('div', { class: 'actions' }, localBtn)),
-      el('div', { class: 'choice' },
-        el('div', { class: 'choice-head' }, el('h2', { text: tr('Бесплатная синхронизация через GitHub') }), el('span', { class: 'badge', text: 'Free sync' })),
-        el('p', { text: tr('Задачи лежат в вашем приватном репозитории GitHub: они одинаковы на всех устройствах, у них есть история, и с ними может работать Claude.') }),
-        el('div', { class: 'actions' }, ghBtn), form)));
+      narrow.matches ? ghCard : localCard, narrow.matches ? localCard : ghCard));
+    if (narrow.matches) { form.hidden = false; ghBtn.hidden = true; }
     ['sync', 'search', 'btn-claude', 'new-task', 'btn-settings'].forEach(function (id) { $(id).hidden = true; });
+    $('mtabs').style.display = 'none';
   }
   function start(b, m) {
     backend = b; mode = m; files = {}; syncErr = null;
+    $('mtabs').style.display = '';
     actions = lsGet('tt-pending-v1:' + repoKey()) || [];
     ['search', 'new-task', 'btn-settings'].forEach(function (id) { $(id).hidden = false; });
     $('btn-claude').hidden = m === 'local';
