@@ -409,6 +409,12 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .note-r { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 10px; background: var(--col); }
 .note-r span { white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 body.note-open { overflow: hidden; }
+.tm-tools { display: flex; gap: 8px; }
+.tm-tool { position: relative; width: 44px; height: 38px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); font-size: 18px; cursor: pointer; }
+.tm-tool[aria-pressed="true"] { background: var(--col); border-color: var(--muted); }
+.tm-tool.has::after { content: ""; position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent, #e5484d); }
+.tm-panel { display: flex; flex-direction: column; gap: 12px; }
+.tm-panel[hidden] { display: none; }
 .modal h2 { margin: 0; font-family: var(--font-display); font-size: 18px; }
 .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .field label, .flabel { font-size: 12px; font-weight: 600; color: var(--muted); }
@@ -507,6 +513,9 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
   /* ---------- язык ---------- */
   var I18N = {
    "en": {
+    "Цвет и метки": "Colour and labels",
+    "Время и параметры": "Time and options",
+    "Значки": "Icons",
     "Язык диктовки": "Dictation language",
     "Заметки": "Notes",
     "+ Заметка": "+ Note",
@@ -849,6 +858,9 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
     "0 — без анимации.": "0 = no animation."
    },
    "de": {
+    "Цвет и метки": "Farbe und Labels",
+    "Время и параметры": "Zeit und Optionen",
+    "Значки": "Symbole",
     "Язык диктовки": "Diktiersprache",
     "Заметки": "Notizen",
     "+ Заметка": "+ Notiz",
@@ -1191,6 +1203,9 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
     "0 — без анимации.": "0 = keine Animation."
    },
    "zh": {
+    "Цвет и метки": "颜色与标签",
+    "Время и параметры": "时间与选项",
+    "Значки": "图标",
     "Язык диктовки": "语音输入语言",
     "Заметки": "笔记",
     "+ Заметка": "+ 笔记",
@@ -3785,6 +3800,20 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
       commitTask(task); closeModal();
     }
     title.addEventListener('keydown', function (e) { if (e.key === 'Enter') commit(); });
+    var toolbar = el('div', { class: 'tm-tools' });
+    [['color', '🎨', tr('Цвет и метки'), function () { return !!(cc || cols.length); }],
+     ['time', '⏱', tr('Время и параметры'), function () { return !!(date.value || startI.value || due.value || pr.value || est.value || area.value || pin.checked || status.value !== colOf(task).id); }],
+     ['icons', '⭐', tr('Значки'), function () { return !!icos.length; }]].forEach(function (t) {
+      var b = el('button', { type: 'button', class: 'tm-tool', text: t[1], title: t[2], 'aria-label': t[2], 'aria-pressed': 'false', data: { p: t[0] } });
+      b.addEventListener('click', function () {
+        var open = b.getAttribute('aria-pressed') !== 'true';
+        toolbar.querySelectorAll('.tm-tool').forEach(function (x) { x.setAttribute('aria-pressed', String(open && x === b)); });
+        document.querySelectorAll('.tm-panel').forEach(function (pn) { pn.hidden = !(open && pn.dataset.p === t[0]); });
+      });
+      b._has = t[3]; toolbar.appendChild(b);
+    });
+    function tmDots() { toolbar.querySelectorAll('.tm-tool').forEach(function (b) { b.classList.toggle('has', !!b._has()); }); }
+    setTimeout(function () { var m = document.querySelector('.modal'); if (m) { m.addEventListener('input', tmDots); m.addEventListener('change', tmDots); m.addEventListener('click', function () { setTimeout(tmDots, 0); }); } tmDots(); }, 0);
     var actions = el('div', { class: 'actions' },
       el('button', { class: 'btn primary', text: isNew ? tr('Создать') : tr('Сохранить'), on: { click: commit } }),
       el('button', { class: 'btn', text: tr('Отмена'), on: { click: closeModal } }), el('span', { class: 'spacer' }));
@@ -3796,15 +3825,19 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
     showModal(isNew ? tr('Новая задача') : tr('Задача'), [
       el('h2', { text: isNew ? tr('Новая задача') : (task.kind === 'routine' ? tr('Распорядок') : tr('Задача')) }),
       field(tr('Название'), 'f-title', title), field(tr('Описание'), 'f-desc', desc),
+      toolbar,
+      el('div', { class: 'tm-panel', data: { p: 'color' }, hidden: true },
+      el('div', { class: 'field' }, el('span', { class: 'flabel', text: tr('Цвет карточки') }), colorPicker(cc ? [cc] : [], function (v) { cc = v[0] || null; }, true)),
+      el('div', { class: 'field' }, el('span', { class: 'flabel', text: tr('Метки') }), colorPicker(cols, function (v) { cols = v; }))),
+      el('div', { class: 'tm-panel', data: { p: 'time' }, hidden: true },
       el('div', { class: 'row2' }, field(tr('Колонка'), 'f-col', status), field(tr('Дата'), 'f-date', date)),
       el('div', { class: 'row2' }, field(tr('Начало'), 'f-start', startI), field(tr('Конец'), 'f-end', endI)),
       el('div', { class: 'row2' }, field(tr('Приоритет'), 'f-pr', pr), field(tr('Оценка, мин'), 'f-est', est)),
       el('div', { class: 'row2' }, field(tr('Область'), 'f-area', area),
         el('div', { class: 'field' }, el('span', { class: 'flabel', text: tr('Для Claude') }), el('label', { class: 'check', for: 'f-pin' }, pin, tr('Не двигать при разборе')))),
-      el('div', { class: 'row2' }, field(tr('Срок на карточке (только надпись)'), 'f-due', due), field(tr('Срок до (для диапазона)'), 'f-due2', dueE)),
-      el('div', { class: 'field' }, el('span', { class: 'flabel', text: tr('Цвет карточки') }), colorPicker(cc ? [cc] : [], function (v) { cc = v[0] || null; }, true)),
-      el('div', { class: 'field' }, el('span', { class: 'flabel', text: tr('Метки') }), colorPicker(cols, function (v) { cols = v; })),
-      el('div', { class: 'field' }, el('span', { class: 'flabel', text: tr('Значки') }), iconPicker(icos, function (v) { icos = v; })),
+      el('div', { class: 'row2' }, field(tr('Срок на карточке (только надпись)'), 'f-due', due), field(tr('Срок до (для диапазона)'), 'f-due2', dueE))),
+      el('div', { class: 'tm-panel', data: { p: 'icons' }, hidden: true },
+      el('div', { class: 'field' }, el('span', { class: 'flabel', text: tr('Значки') }), iconPicker(icos, function (v) { icos = v; }))),
       task.aiNote ? el('div', { class: 'ainote' }, el('b', { text: tr('Комментарий Claude: ') }), task.aiNote) : null,
       task.carriedFrom && task.carriedFrom.length ? el('p', { class: 'hint', text: tr('Переносилась с недель: ') + task.carriedFrom.join(', ') }) : null,
       el('p', { class: 'hint', text: tr('Без даты задача лежит в Inbox. С датой и временем стоит в сетке дня.') }),
