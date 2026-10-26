@@ -400,6 +400,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .note-input { flex: none; width: 100%; min-height: 38dvh; font: inherit; font-size: 18px; line-height: 1.4; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); resize: none; }
 .note-actions { display: flex; gap: 10px; }
 .note-actions .btn, .note-mic { min-height: 52px; font-size: 17px; }
+.note-lang { width: 64px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font-weight: 700; font-size: 16px; }
 .note-save { flex: 1; justify-content: center; text-align: center; }
 .note-mic { width: 64px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font-size: 24px; }
 .note-mic.on { background: var(--accent, #e5484d); animation: note-pulse 1s infinite; }
@@ -506,6 +507,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
   /* ---------- язык ---------- */
   var I18N = {
    "en": {
+    "Язык диктовки": "Dictation language",
     "Заметки": "Notes",
     "+ Заметка": "+ Note",
     "Текст заметки": "Note text",
@@ -847,6 +849,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
     "0 — без анимации.": "0 = no animation."
    },
    "de": {
+    "Язык диктовки": "Diktiersprache",
     "Заметки": "Notizen",
     "+ Заметка": "+ Notiz",
     "Текст заметки": "Notiztext",
@@ -1188,6 +1191,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
     "0 — без анимации.": "0 = keine Animation."
    },
    "zh": {
+    "Язык диктовки": "语音输入语言",
     "Заметки": "笔记",
     "+ Заметка": "+ 笔记",
     "Текст заметки": "笔记内容",
@@ -2291,6 +2295,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
   // быстрая заметка с телефона: большое поле, диктовка (клавиатура или распознавание речи), сохранить
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   var SPEECH_LANG = { en: 'en-US', ru: 'ru-RU', de: 'de-DE', zh: 'zh-CN' };
+  function dictLang() { return SPEECH_LANG[ui.dictLang] ? ui.dictLang : LANG; }
   function noteSheet() {
     if (document.querySelector('.note-sheet')) return;
     var ta = el('textarea', { class: 'note-input', placeholder: tr('Продиктуйте или напишите заметку'), 'aria-label': tr('Текст заметки'), rows: '6' });
@@ -2299,13 +2304,19 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
     function stop() { listening = false; if (mic) { mic.setAttribute('aria-pressed', 'false'); mic.classList.remove('on'); } if (rec) { try { rec.stop(); } catch (e) {} rec = null; } }
     if (mic) mic.addEventListener('click', function () {
       if (listening) { stop(); return; }
-      rec = new SR(); rec.lang = SPEECH_LANG[LANG] || 'en-US'; rec.interimResults = true; rec.continuous = true;
+      rec = new SR(); rec.lang = SPEECH_LANG[dictLang()] || 'en-US'; rec.interimResults = true; rec.continuous = true;
       base = ta.value ? ta.value.replace(/\s*$/, ' ') : '';
       rec.onresult = function (ev) { var s = ''; for (var i = 0; i < ev.results.length; i++) s += ev.results[i][0].transcript; ta.value = base + s; };
       rec.onend = function () { if (listening) stop(); };
       rec.onerror = function () { stop(); };
       try { rec.start(); listening = true; mic.setAttribute('aria-pressed', 'true'); mic.classList.add('on'); } catch (e) { stop(); }
     });
+    var lng = SR ? el('button', { type: 'button', class: 'note-lang', title: tr('Язык диктовки'), 'aria-label': tr('Язык диктовки') }) : null;
+    function showLang() { lng.textContent = dictLang().toUpperCase(); }
+    if (lng) { showLang(); lng.addEventListener('click', function () {
+      var ks = Object.keys(SPEECH_LANG); ui.dictLang = ks[(ks.indexOf(dictLang()) + 1) % ks.length]; lsSet(UI_KEY, ui); showLang();
+      if (listening) { stop(); mic.click(); }
+    }); }
     var sheet;
     function close() { stop(); sheet.remove(); document.body.classList.remove('note-open'); }
     var save = el('button', { type: 'button', class: 'btn primary note-save', text: tr('Сохранить') });
@@ -2314,7 +2325,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
     var recent = el('div', { class: 'note-recent' });
     notes().slice(0, 5).forEach(function (t) { recent.appendChild(el('div', { class: 'note-r' }, el('span', { text: t.desc || t.title }), el('small', { text: noteStamp(t) }))); });
     sheet = el('div', { class: 'note-sheet', role: 'dialog', 'aria-label': tr('Новая заметка') },
-      el('div', { class: 'note-bar' }, el('strong', { text: tr('Новая заметка') }), x), ta, el('div', { class: 'note-actions' }, mic, save), recent);
+      el('div', { class: 'note-bar' }, el('strong', { text: tr('Новая заметка') }), x), ta, el('div', { class: 'note-actions' }, mic, lng, save), recent);
     document.body.appendChild(sheet); document.body.classList.add('note-open');
     ta.focus();
   }
