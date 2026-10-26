@@ -35,7 +35,7 @@
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --night-rgb: 30 52 150; --work-rgb: 200 100 20; --dinner-rgb: 30 130 72;
     --bg: #18151A; --surface: #242026; --fg: #F2EDED; --muted: #A59CA0; --line: #3A3238; --col: #1F1B21;
     --accent: #FF6977; --accent-ink: #2A0A0E; --accent-soft: #4A2328; --warn: #FF9A93; --ok: #8FD6A9; --amber: #F2CE92;
@@ -49,6 +49,20 @@
     color-scheme: dark;
   }
 }
+:root[data-theme="dark"] {
+    --night-rgb: 30 52 150; --work-rgb: 200 100 20; --dinner-rgb: 30 130 72;
+    --bg: #18151A; --surface: #242026; --fg: #F2EDED; --muted: #A59CA0; --line: #3A3238; --col: #1F1B21;
+    --accent: #FF6977; --accent-ink: #2A0A0E; --accent-soft: #4A2328; --warn: #FF9A93; --ok: #8FD6A9; --amber: #F2CE92;
+    --a-work-bg: #20384F; --a-work-fg: #A8CDF2;
+    --a-home-bg: #4A3719; --a-home-fg: #F2CE92;
+    --a-finance-bg: #1F4030; --a-finance-fg: #A6DDB9;
+    --a-health-bg: #4A2540; --a-health-fg: #F0B8DD;
+    --a-food-bg: #4F2D1D; --a-food-fg: #F5BE9F;
+    --a-sleep-bg: #2E2C52; --a-sleep-fg: #C3C0F5;
+    --a-personal-bg: #1B3F3D; --a-personal-fg: #9EDDD8;
+    color-scheme: dark;
+}
+:root[data-theme="light"] { color-scheme: light; }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
 body {
@@ -679,6 +693,11 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
     "Зарядка": "Exercise",
     "Свернуть": "Collapse",
     "Развернуть": "Expand",
+    "Тема": "Theme",
+    "Как в системе": "System",
+    "Светлая": "Light",
+    "Тёмная": "Dark",
+    "Оформление интерфейса. «Как в системе» следует настройке устройства.": "Look of the interface. “System” follows your device setting.",
     "Вставить из буфера": "Paste from clipboard",
     "Вставлено из буфера": "Pasted from clipboard",
     "В буфере нет токена. Скопируйте его и нажмите ещё раз или вставьте вручную.": "No token on the clipboard. Copy it and tap again, or paste it manually.",
@@ -958,6 +977,11 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
     "Зарядка": "Sport",
     "Свернуть": "Einklappen",
     "Развернуть": "Ausklappen",
+    "Тема": "Design",
+    "Как в системе": "System",
+    "Светлая": "Hell",
+    "Тёмная": "Dunkel",
+    "Оформление интерфейса. «Как в системе» следует настройке устройства.": "Aussehen der Oberfläche. „System“ folgt der Geräteeinstellung.",
     "Вставить из буфера": "Aus Zwischenablage einfügen",
     "Вставлено из буфера": "Aus der Zwischenablage eingefügt",
     "В буфере нет токена. Скопируйте его и нажмите ещё раз или вставьте вручную.": "Kein Token in der Zwischenablage. Kopiere ihn und tippe erneut oder füge ihn manuell ein.",
@@ -1237,6 +1261,11 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
     "Зарядка": "锻炼",
     "Свернуть": "折叠",
     "Развернуть": "展开",
+    "Тема": "主题",
+    "Как в системе": "跟随系统",
+    "Светлая": "浅色",
+    "Тёмная": "深色",
+    "Оформление интерфейса. «Как в системе» следует настройке устройства.": "界面外观。“跟随系统”将使用设备的设置。",
     "Вставить из буфера": "从剪贴板粘贴",
     "Вставлено из буфера": "已从剪贴板粘贴",
     "В буфере нет токена. Скопируйте его и нажмите ещё раз или вставьте вручную.": "剪贴板中没有令牌。请复制后再点一次，或手动粘贴。",
@@ -1532,11 +1561,19 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
   var cfg = lsGet(CFG_KEY);
   var ui = lsGet(UI_KEY) || {};
   PPM = clamp(+ui.ppm || 1, 0.4, 64);
-  var DEFAULT_SETTINGS = { entrance: 'pop', entranceMs: 900, popScale: 25, popRot: 40, popMove: 40, calW: 50, calWF: 33, zoomMs: 160, tNight: 58, tWork: 70, tDinner: 70, placeFx: 'pop', sound: !window.matchMedia('(pointer: coarse)').matches, volume: 50, hoverVol: 25, hoverShift: 0, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
+  var DEFAULT_SETTINGS = { theme: 'system', entrance: 'pop', entranceMs: 900, popScale: 25, popRot: 40, popMove: 40, calW: 50, calWF: 33, zoomMs: 160, tNight: 58, tWork: 70, tDinner: 70, placeFx: 'pop', sound: !window.matchMedia('(pointer: coarse)').matches, volume: 50, hoverVol: 25, hoverShift: 0, wheel: 'scroll', layout: 'left', slide: 600, hover: 200, grip: 4, idle: 60, onHide: true, onBlur: false, squash: 'day', poll: 60,
     lang: 'en', device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'phone' : 'computer' };
   var settings = Object.assign({}, DEFAULT_SETTINGS, ui.settings || {});
   document.documentElement.style.setProperty('--hover-ms', settings.hover + 'ms');
   setLang(settings.lang);
+  function applyTheme() {
+    var t = settings.theme;
+    if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme');
+    var c = t === 'light' ? ['#F6F3F2', '#F6F3F2'] : t === 'dark' ? ['#18151A', '#18151A'] : ['#F6F3F2', '#18151A'];
+    var ms = document.querySelectorAll('meta[name="theme-color"]');
+    if (ms[0]) ms[0].setAttribute('content', c[0]); if (ms[1]) ms[1].setAttribute('content', c[1]);
+  }
+  applyTheme();
   function applyZones() {
     var st = document.documentElement.style;
     st.setProperty('--night-a', String(1 - clamp(settings.tNight, 0, 100) / 100));
@@ -3585,6 +3622,8 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
       mode === 'local' ? null : el('p', { class: 'hint', text: n ? tr('Не сохранено: {what}. Они хранятся в этом браузере и не пропадут при закрытии вкладки.', { what: trn('{n} действие|{n} действия|{n} действий', n) })
         : tr('Всё сохранено.') + (lastSubject ? ' ' + tr('Последний коммит: {s}', { s: lastSubject }) : '') }),
       group('general', tr('Общие'), [
+      row(tr('Тема'), 's-theme', sel('s-theme', settings.theme, [['system', tr('Как в системе')], ['light', tr('Светлая')], ['dark', tr('Тёмная')]],
+        function (v) { settings.theme = v; applyTheme(); }), tr('Оформление интерфейса. «Как в системе» следует настройке устройства.')),
       row(tr('Язык'), 's-lang', sel('s-lang', settings.lang, LANGS, function (v) {
         settings.lang = v; saveSettings(); setLang(v);
         if (files[P_BOARD] && !files[P_BOARD].sha) { files[P_BOARD].base = defaultBoard(); recompute(P_BOARD); }
