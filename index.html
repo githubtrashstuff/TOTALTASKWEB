@@ -386,6 +386,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .overlay { position: fixed; inset: 0; z-index: 40; background: rgb(20 12 16 / .5); display: grid; place-items: center;
   padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
 .modal { background: var(--surface); width: min(540px, 100%); max-height: 100%; overflow: auto; border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 12px; border: 1px solid var(--line); }
+.help { display: grid; grid-template-columns: minmax(150px, 38%) 1fr; gap: 6px 14px; margin: 0; font-size: 13px; }
+.help dt { font-weight: 600; color: var(--text); }
+.help dd { margin: 0; color: var(--muted); }
+.help-h { margin: 8px 0 0; font-family: var(--font-display); font-size: 14px; }
 .modal h2 { margin: 0; font-family: var(--font-display); font-size: 18px; }
 .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .field label, .flabel { font-size: 12px; font-weight: 600; color: var(--muted); }
@@ -457,6 +461,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
   <input class="search" id="search" type="search" placeholder="Search tasks" aria-label="Search tasks" hidden>
   <button class="btn" id="btn-claude" hidden>ANALYZE</button>
   <button class="btn primary" id="new-task" hidden>+ Task</button>
+  <button class="btn" id="btn-help" aria-label="Help" title="Help" hidden>?</button>
   <button class="btn" id="btn-settings" aria-label="Settings" title="Settings" hidden>⚙</button>
 </header>
 <main id="view"></main>
@@ -481,6 +486,53 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
   /* ---------- язык ---------- */
   var I18N = {
    "en": {
+    "Горячие клавиши и управление": "Hotkeys and controls",
+    "Только для версии на компьютере.": "Desktop version only.",
+    "Справка": "Help",
+    "Прокрутка по вертикали": "Scroll vertically",
+    "Колесо мыши": "Mouse wheel",
+    "Масштаб времени вокруг курсора (меняется в настройках)": "Zoom time around the cursor (swap in settings)",
+    "Alt + колесо / Ctrl + колесо": "Alt + wheel / Ctrl + wheel",
+    "Прокрутка по вертикали (pan)": "Pan vertically",
+    "Правая кнопка по пустому месту + тянуть": "Right button on empty space + drag",
+    "Вернуться к линии текущего времени": "Jump back to the current time line",
+    "Весь день на экране; второе нажатие — вернуться на прежнее место и масштаб": "Fit the whole day; press again to return to the previous position and zoom",
+    "Создать карточку нужной длины (сверху видна длительность)": "Create a card of the needed length (duration shown on top)",
+    "Перетащить по пустому месту / правая кнопка + тянуть": "Drag on empty space / right button + drag",
+    "Сохранить заполняемую карточку": "Save the card you are filling in",
+    "Enter / клик мимо": "Enter / click outside",
+    "Отмена перетаскивания или закрытие окна": "Cancel a drag or close the window",
+    "Карточки": "Cards",
+    "Перенести карточку; соседние раздвигаются в реальном времени": "Move a card; neighbours make room in real time",
+    "Перетащить": "Drag",
+    "Клонировать карточку": "Clone the card",
+    "Alt + перетащить": "Alt + drag",
+    "Привязка по времени 5 минут (без клавиши — без привязки)": "Snap time to 5 minutes (no key — no snapping)",
+    "Ctrl при перетаскивании": "Ctrl while dragging",
+    "Привязка по времени 10 минут": "Snap time to 10 minutes",
+    "Shift при перетаскивании": "Shift while dragging",
+    "Растягивание: тянуть верхний или нижний край": "Resize: drag the top or bottom edge",
+    "Край блока в календаре": "Edge of a block in the calendar",
+    "Открыть карточку": "Open the card",
+    "Клик": "Click",
+    "Убрать карточку из календаря": "Remove the card from the calendar",
+    "Shift + клик": "Shift + click",
+    "Удалить карточку": "Delete the card",
+    "Shift + Alt + клик (канбан)": "Shift + Alt + click (board)",
+    "Меню: цвет, значки, быстрые даты, удалить": "Menu: colour, icons, quick dates, delete",
+    "Правая кнопка по карточке": "Right button on a card",
+    "Карточка ложится на точное время под курсором": "The card lands on the exact time under the cursor",
+    "Перетащить из канбана в календарь": "Drag from board to calendar",
+    "Колонки и режимы": "Columns and modes",
+    "Меню колонки, в том числе удаление": "Column menu, including delete",
+    "Правая кнопка по колонке": "Right button on a column",
+    "Свернуть колонку до маленькой кнопки": "Collapse the column to a small button",
+    "Кнопка сворачивания колонки": "Column collapse button",
+    "День, 3 дня, неделя, месяц, I (бесконечная лента), F (фокус)": "Day, 3 days, week, month, I (infinite feed), F (focus)",
+    "Режимы календаря": "Calendar modes",
+    "Особая колонка: её карточки показываются в календаре кнопкой «show rutines»": "Special column: its cards show in the calendar with “show rutines”",
+    "Автоматический цвет для новых карточек": "Automatic colour for new cards",
+    "Кнопка AC": "AC button",
     "Бэклог": "Backlog",
     "В работе": "In progress",
     "Ждёт": "Waiting",
@@ -765,6 +817,53 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
     "0 — без анимации.": "0 = no animation."
    },
    "de": {
+    "Горячие клавиши и управление": "Tastenkürzel und Bedienung",
+    "Только для версии на компьютере.": "Nur für die Desktop-Version.",
+    "Справка": "Hilfe",
+    "Прокрутка по вертикали": "Vertikal scrollen",
+    "Колесо мыши": "Mausrad",
+    "Масштаб времени вокруг курсора (меняется в настройках)": "Zeit-Zoom um den Cursor (in den Einstellungen tauschbar)",
+    "Alt + колесо / Ctrl + колесо": "Alt + Rad / Strg + Rad",
+    "Прокрутка по вертикали (pan)": "Vertikal verschieben",
+    "Правая кнопка по пустому месту + тянуть": "Rechte Maustaste auf leerer Fläche + ziehen",
+    "Вернуться к линии текущего времени": "Zurück zur aktuellen Zeitlinie",
+    "Весь день на экране; второе нажатие — вернуться на прежнее место и масштаб": "Ganzer Tag im Blick; erneut drücken: zurück zu Position und Zoom",
+    "Создать карточку нужной длины (сверху видна длительность)": "Karte in gewünschter Länge anlegen (Dauer oben sichtbar)",
+    "Перетащить по пустому месту / правая кнопка + тянуть": "Auf leerer Fläche ziehen / rechte Taste + ziehen",
+    "Сохранить заполняемую карточку": "Ausgefüllte Karte speichern",
+    "Enter / клик мимо": "Enter / Klick daneben",
+    "Отмена перетаскивания или закрытие окна": "Ziehen abbrechen oder Fenster schließen",
+    "Карточки": "Karten",
+    "Перенести карточку; соседние раздвигаются в реальном времени": "Karte verschieben; Nachbarn weichen in Echtzeit aus",
+    "Перетащить": "Ziehen",
+    "Клонировать карточку": "Karte klonen",
+    "Alt + перетащить": "Alt + ziehen",
+    "Привязка по времени 5 минут (без клавиши — без привязки)": "Zeit auf 5 Minuten einrasten (ohne Taste: frei)",
+    "Ctrl при перетаскивании": "Strg beim Ziehen",
+    "Привязка по времени 10 минут": "Zeit auf 10 Minuten einrasten",
+    "Shift при перетаскивании": "Umschalt beim Ziehen",
+    "Растягивание: тянуть верхний или нижний край": "Größe ändern: oberen oder unteren Rand ziehen",
+    "Край блока в календаре": "Rand eines Blocks im Kalender",
+    "Открыть карточку": "Karte öffnen",
+    "Клик": "Klick",
+    "Убрать карточку из календаря": "Karte aus dem Kalender entfernen",
+    "Shift + клик": "Umschalt + Klick",
+    "Удалить карточку": "Karte löschen",
+    "Shift + Alt + клик (канбан)": "Umschalt + Alt + Klick (Board)",
+    "Меню: цвет, значки, быстрые даты, удалить": "Menü: Farbe, Symbole, Schnelldaten, Löschen",
+    "Правая кнопка по карточке": "Rechte Maustaste auf Karte",
+    "Карточка ложится на точное время под курсором": "Die Karte landet auf der exakten Zeit unter dem Cursor",
+    "Перетащить из канбана в календарь": "Vom Board in den Kalender ziehen",
+    "Колонки и режимы": "Spalten und Modi",
+    "Меню колонки, в том числе удаление": "Spaltenmenü, auch zum Löschen",
+    "Правая кнопка по колонке": "Rechte Maustaste auf Spalte",
+    "Свернуть колонку до маленькой кнопки": "Spalte zu einem kleinen Button einklappen",
+    "Кнопка сворачивания колонки": "Einklapp-Button der Spalte",
+    "День, 3 дня, неделя, месяц, I (бесконечная лента), F (фокус)": "Tag, 3 Tage, Woche, Monat, I (endlos), F (Fokus)",
+    "Режимы календаря": "Kalendermodi",
+    "Особая колонка: её карточки показываются в календаре кнопкой «show rutines»": "Spezielle Spalte: ihre Karten erscheinen per „show rutines“ im Kalender",
+    "Автоматический цвет для новых карточек": "Automatische Farbe für neue Karten",
+    "Кнопка AC": "AC-Button",
     "Бэклог": "Backlog",
     "В работе": "In Arbeit",
     "Ждёт": "Wartet",
@@ -1049,6 +1148,53 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
     "0 — без анимации.": "0 = keine Animation."
    },
    "zh": {
+    "Горячие клавиши и управление": "快捷键与操作",
+    "Только для версии на компьютере.": "仅适用于电脑版。",
+    "Справка": "帮助",
+    "Прокрутка по вертикали": "垂直滚动",
+    "Колесо мыши": "鼠标滚轮",
+    "Масштаб времени вокруг курсора (меняется в настройках)": "围绕光标缩放时间（可在设置中互换）",
+    "Alt + колесо / Ctrl + колесо": "Alt + 滚轮 / Ctrl + 滚轮",
+    "Прокрутка по вертикали (pan)": "垂直平移",
+    "Правая кнопка по пустому месту + тянуть": "在空白处按右键拖动",
+    "Вернуться к линии текущего времени": "回到当前时间线",
+    "Весь день на экране; второе нажатие — вернуться на прежнее место и масштаб": "显示整天；再按一次返回原位置和缩放",
+    "Создать карточку нужной длины (сверху видна длительность)": "创建指定时长的卡片（顶部显示时长）",
+    "Перетащить по пустому месту / правая кнопка + тянуть": "在空白处拖动 / 右键拖动",
+    "Сохранить заполняемую карточку": "保存正在填写的卡片",
+    "Enter / клик мимо": "Enter / 点击外部",
+    "Отмена перетаскивания или закрытие окна": "取消拖动或关闭窗口",
+    "Карточки": "卡片",
+    "Перенести карточку; соседние раздвигаются в реальном времени": "移动卡片；相邻卡片实时让位",
+    "Перетащить": "拖动",
+    "Клонировать карточку": "克隆卡片",
+    "Alt + перетащить": "Alt + 拖动",
+    "Привязка по времени 5 минут (без клавиши — без привязки)": "时间吸附到 5 分钟（不按键则不吸附）",
+    "Ctrl при перетаскивании": "拖动时按 Ctrl",
+    "Привязка по времени 10 минут": "时间吸附到 10 分钟",
+    "Shift при перетаскивании": "拖动时按 Shift",
+    "Растягивание: тянуть верхний или нижний край": "调整大小：拖动上边缘或下边缘",
+    "Край блока в календаре": "日历中块的边缘",
+    "Открыть карточку": "打开卡片",
+    "Клик": "点击",
+    "Убрать карточку из календаря": "从日历中移除卡片",
+    "Shift + клик": "Shift + 点击",
+    "Удалить карточку": "删除卡片",
+    "Shift + Alt + клик (канбан)": "Shift + Alt + 点击（看板）",
+    "Меню: цвет, значки, быстрые даты, удалить": "菜单：颜色、图标、快捷日期、删除",
+    "Правая кнопка по карточке": "在卡片上按右键",
+    "Карточка ложится на точное время под курсором": "卡片落在光标下的准确时间",
+    "Перетащить из канбана в календарь": "从看板拖到日历",
+    "Колонки и режимы": "列与模式",
+    "Меню колонки, в том числе удаление": "列菜单，包括删除",
+    "Правая кнопка по колонке": "在列上按右键",
+    "Свернуть колонку до маленькой кнопки": "将列折叠为小按钮",
+    "Кнопка сворачивания колонки": "列折叠按钮",
+    "День, 3 дня, неделя, месяц, I (бесконечная лента), F (фокус)": "日、3 天、周、月、I（无限滚动）、F（专注）",
+    "Режимы календаря": "日历模式",
+    "Особая колонка: её карточки показываются в календаре кнопкой «show rutines»": "特殊列：其卡片可通过“show rutines”显示在日历中",
+    "Автоматический цвет для новых карточек": "新卡片自动配色",
+    "Кнопка AC": "AC 按钮",
     "Бэклог": "待办",
     "В работе": "进行中",
     "Ждёт": "等待中",
@@ -1362,6 +1508,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
     var map = { 'mt-cal': tr('Календарь'), 'mt-board': tr('Доска'), 'btn-claude': tr('АНАЛИЗ'), 'new-task': tr('+ Задача') };
     for (var id in map) { var n = document.getElementById(id); if (n) n.textContent = tr(map[id]); }
     var se = document.getElementById('search'); if (se) { se.placeholder = tr('Поиск по задачам'); se.setAttribute('aria-label', tr('Поиск по задачам')); }
+    var hb = document.getElementById('btn-help'); if (hb) { hb.title = tr('Справка'); hb.setAttribute('aria-label', tr('Справка')); }
     var st = document.getElementById('btn-settings'); if (st) { st.title = tr('Настройки'); st.setAttribute('aria-label', tr('Настройки')); }
   }
 
@@ -3608,6 +3755,16 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
     rows.forEach(function (r) { if (r) d.appendChild(r); });
     return d;
   }
+  var HELP = [["Календарь", [["Колесо мыши", "Прокрутка по вертикали"], ["Alt + колесо / Ctrl + колесо", "Масштаб времени вокруг курсора (меняется в настройках)"], ["Правая кнопка по пустому месту + тянуть", "Прокрутка по вертикали (pan)"], ["Space", "Вернуться к линии текущего времени"], ["Tab", "Весь день на экране; второе нажатие — вернуться на прежнее место и масштаб"], ["Перетащить по пустому месту / правая кнопка + тянуть", "Создать карточку нужной длины (сверху видна длительность)"], ["Enter / клик мимо", "Сохранить заполняемую карточку"], ["Esc", "Отмена перетаскивания или закрытие окна"]]], ["Карточки", [["Перетащить", "Перенести карточку; соседние раздвигаются в реальном времени"], ["Alt + перетащить", "Клонировать карточку"], ["Ctrl при перетаскивании", "Привязка по времени 5 минут (без клавиши — без привязки)"], ["Shift при перетаскивании", "Привязка по времени 10 минут"], ["Край блока в календаре", "Растягивание: тянуть верхний или нижний край"], ["Клик", "Открыть карточку"], ["Shift + клик", "Убрать карточку из календаря"], ["Shift + Alt + клик (канбан)", "Удалить карточку"], ["Правая кнопка по карточке", "Меню: цвет, значки, быстрые даты, удалить"], ["Перетащить из канбана в календарь", "Карточка ложится на точное время под курсором"]]], ["Колонки и режимы", [["Правая кнопка по колонке", "Меню колонки, в том числе удаление"], ["Кнопка сворачивания колонки", "Свернуть колонку до маленькой кнопки"], ["Режимы календаря", "День, 3 дня, неделя, месяц, I (бесконечная лента), F (фокус)"], ["Rutines", "Особая колонка: её карточки показываются в календаре кнопкой «show rutines»"], ["Кнопка AC", "Автоматический цвет для новых карточек"]]]];
+  function helpModal() {
+    var body = [el('h2', { text: tr('Горячие клавиши и управление') }), el('p', { class: 'hint', text: tr('Только для версии на компьютере.') })];
+    HELP.forEach(function (g) {
+      var dl = el('dl', { class: 'help' });
+      g[1].forEach(function (r) { dl.appendChild(el('dt', { text: tr(r[0]) })); dl.appendChild(el('dd', { text: tr(r[1]) })); });
+      body.push(el('h3', { class: 'help-h', text: tr(g[0]) }), dl);
+    });
+    showModal(tr('Справка'), body);
+  }
   function settingsModal() {
     function sel(id, value, opts, onChange) {
       var x = el('select', { id: id });
@@ -3782,14 +3939,14 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
       el('div', { class: 'connect-top' }, el('h1', { text: tr('Где хранить задачи?') }), lang),
       narrow.matches ? ghCard : localCard, narrow.matches ? localCard : ghCard));
     if (narrow.matches) { form.hidden = false; ghBtn.hidden = true; }
-    ['sync', 'search', 'btn-claude', 'new-task', 'btn-settings'].forEach(function (id) { $(id).hidden = true; });
+    ['sync', 'search', 'btn-claude', 'new-task', 'btn-help', 'btn-settings'].forEach(function (id) { $(id).hidden = true; });
     $('mtabs').style.display = 'none';
   }
   function start(b, m) {
     backend = b; mode = m; files = {}; syncErr = null;
     $('mtabs').style.display = '';
     actions = lsGet('tt-pending-v1:' + repoKey()) || [];
-    ['search', 'new-task', 'btn-settings'].forEach(function (id) { $(id).hidden = false; });
+    ['search', 'new-task', 'btn-help', 'btn-settings'].forEach(function (id) { $(id).hidden = false; });
     $('btn-claude').hidden = m === 'local';
     introFlag = true; introUntil = performance.now() + 2500;
     ensureFile(P_BOARD); ensureFile(P_INBOX); ensureFile(P_PRESETS); if (m === 'github') ensureFile(P_REPORT);
@@ -3817,6 +3974,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
   $('new-task').addEventListener('click', function () { openNew({}); });
   $('btn-claude').addEventListener('click', claudeModal);
   $('btn-settings').addEventListener('click', settingsModal);
+  $('btn-help').addEventListener('click', helpModal);
   $('search').addEventListener('input', function (e) { query = e.target.value.trim(); render(); });
   $('sync').addEventListener('click', function () { if (actions.length) flush('manual'); else poll(); });
   ['pointerdown', 'keydown', 'input'].forEach(function (t) { document.addEventListener(t, activity, true); });
