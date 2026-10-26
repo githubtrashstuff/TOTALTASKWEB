@@ -413,7 +413,7 @@ body.note-open { overflow: hidden; }
 .tm-tool { position: relative; width: 44px; height: 38px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); font-size: 18px; cursor: pointer; }
 .tm-tool[aria-pressed="true"] { background: var(--col); border-color: var(--muted); }
 .tm-tool.has::after { content: ""; position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent, #e5484d); }
-.tm-panel { display: flex; flex-direction: column; gap: 12px; }
+.tm-panel { position: fixed; z-index: 70; display: flex; flex-direction: column; gap: 12px; padding: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 12px 36px rgb(0 0 0 / .35); overflow: auto; }
 .tm-panel[hidden] { display: none; }
 .modal h2 { margin: 0; font-family: var(--font-display); font-size: 18px; }
 .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
@@ -3808,12 +3808,18 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
       b.addEventListener('click', function () {
         var open = b.getAttribute('aria-pressed') !== 'true';
         toolbar.querySelectorAll('.tm-tool').forEach(function (x) { x.setAttribute('aria-pressed', String(open && x === b)); });
-        document.querySelectorAll('.tm-panel').forEach(function (pn) { pn.hidden = !(open && pn.dataset.p === t[0]); });
+        document.querySelectorAll('.tm-panel').forEach(function (pn) {
+          pn.hidden = !(open && pn.dataset.p === t[0]); if (pn.hidden) return;
+          var r = b.getBoundingClientRect(), w = Math.min(480, innerWidth - 16);
+          pn.style.width = w + 'px'; pn.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + 'px';
+          pn.style.top = r.bottom + 6 + 'px'; pn.style.maxHeight = Math.max(160, innerHeight - r.bottom - 14) + 'px';
+        });
       });
       b._has = t[3]; toolbar.appendChild(b);
     });
+    function closePanels() { toolbar.querySelectorAll('.tm-tool').forEach(function (x) { x.setAttribute('aria-pressed', 'false'); }); document.querySelectorAll('.tm-panel').forEach(function (pn) { pn.hidden = true; }); }
     function tmDots() { toolbar.querySelectorAll('.tm-tool').forEach(function (b) { b.classList.toggle('has', !!b._has()); }); }
-    setTimeout(function () { var m = document.querySelector('.modal'); if (m) { m.addEventListener('input', tmDots); m.addEventListener('change', tmDots); m.addEventListener('click', function () { setTimeout(tmDots, 0); }); } tmDots(); }, 0);
+    setTimeout(function () { var m = document.querySelector('.modal'); if (m) { m.addEventListener('mousedown', function (e) { if (!e.target.closest('.tm-panel, .tm-tool')) closePanels(); }); m.addEventListener('input', tmDots); m.addEventListener('change', tmDots); m.addEventListener('click', function () { setTimeout(tmDots, 0); }); } tmDots(); }, 0);
     var actions = el('div', { class: 'actions' },
       el('button', { class: 'btn primary', text: isNew ? tr('Создать') : tr('Сохранить'), on: { click: commit } }),
       el('button', { class: 'btn', text: tr('Отмена'), on: { click: closeModal } }), el('span', { class: 'spacer' }));
