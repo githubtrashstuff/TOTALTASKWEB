@@ -414,6 +414,17 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
 .gh-steps { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .ok-note { color: var(--ok); font-size: 13px; }
 @media (max-width: 760px) {
+  /* версия для телефона: только лента I на весь экран, ничего лишнего, без полос прокрутки */
+  body { padding-left: 0; padding-right: 0; }
+  .top, .cal-bar, .inbox, .pane-board, .pane-empty { display: none !important; }
+  main { padding: env(safe-area-inset-top, 0px) 0 0 0; }
+  .split { display: block; height: auto; min-height: 0; }
+  .pane-cal { display: flex !important; height: calc(100dvh - env(safe-area-inset-top, 0px)); min-height: 0; }
+  .cal-wrap { gap: 0; }
+  .tg { border: 0; border-radius: 0; scrollbar-width: none; -ms-overflow-style: none; }
+  .tg::-webkit-scrollbar { display: none; width: 0; height: 0; }
+  .inf-dh .add-day { display: none; }
+  .connect { margin: max(16px, env(safe-area-inset-top, 0px)) 12px 24px; max-width: none; }
   .top { gap: 8px; }
   .top .search, #new-task, #btn-claude { display: none !important; }
   .modes .tab.hide-m, .modes .hide-m { display: none !important; }
@@ -1590,7 +1601,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
   var narrow = window.matchMedia('(max-width: 760px)');
   var mtab = 'cal';
   var calMode = ['month', 'week', '3d', 'day', 'focus', 'infinite'].indexOf(ui.calMode) >= 0 ? ui.calMode : (narrow.matches ? 'infinite' : '3d');
-  if (calMode === 'focus' && narrow.matches) calMode = 'infinite';
+  if (narrow.matches) calMode = 'infinite';
   var introFlag = true, introUntil = performance.now() + 2500;
   var calDate = new Date(today);
   var gridScroll = Math.max(390, nowMin() - 120) * PPM;
@@ -2230,7 +2241,8 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
     needRender = false;
     var root = $('view');
     if (!backend) { renderConnect(root); return; }
-    if (calMode === 'focus') { if (narrow.matches) calMode = 'infinite'; else calDate = new Date(today); }
+    if (narrow.matches) calMode = 'infinite';
+    if (calMode === 'focus') calDate = new Date(today);
     if (calMode === 'infinite' && !inf.base) inf.base = new Date(today);
     if (calMode === 'week') calDate = weekMonday(calDate);
     var weeks = visibleWeeks();
@@ -3318,6 +3330,16 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highl
       else tap = { t: now, x: t.clientX, y: t.clientY };
     }, { passive: true });
     scroller.addEventListener('touchcancel', function () { pinEnd(null); }, { passive: true });
+    // настройки на телефоне: долгое нажатие на заголовок дня (кнопок в интерфейсе нет)
+    var hold = 0, hx = 0, hy = 0;
+    scroller.addEventListener('touchstart', function (e) {
+      clearTimeout(hold);
+      if (e.touches.length !== 1 || !e.target.closest || !e.target.closest('.inf-dh') || e.target.closest('.chip')) return;
+      hx = e.touches[0].clientX; hy = e.touches[0].clientY;
+      hold = setTimeout(function () { hold = 0; settingsModal(); }, 700);
+    }, { passive: true });
+    scroller.addEventListener('touchmove', function (e) { var t = e.touches[0]; if (hold && t && Math.hypot(t.clientX - hx, t.clientY - hy) > 10) { clearTimeout(hold); hold = 0; } }, { passive: true });
+    scroller.addEventListener('touchend', function () { clearTimeout(hold); hold = 0; }, { passive: true });
   }
   function scrollerEvents(scroller) {
     touchSetup(scroller);
